@@ -8,17 +8,21 @@ import { TOOLS } from "@/lib/tools";
 
 export default function ToolsHub() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0a0b0e] text-bla-white">
+    <div className="relative min-h-screen overflow-hidden bg-bla-dark text-bla-white">
       <div
         className="pointer-events-none absolute inset-0 bg-grid-faint bg-grid opacity-40"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -right-24 bottom-0 h-[420px] w-[420px] rounded-full bg-bla-blue/35 blur-[120px]"
+        className="pointer-events-none absolute -left-32 top-0 h-[420px] w-[420px] rounded-full bg-bla-lime/10 blur-[120px]"
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -left-20 top-1/3 h-[320px] w-[320px] rounded-full bg-bla-blue/20 blur-[100px]"
+        className="pointer-events-none absolute -right-24 bottom-0 h-[420px] w-[420px] rounded-full bg-bla-blue/40 blur-[110px]"
+        aria-hidden
+      />
+      <div
+        className="pointer-events-none absolute left-1/3 top-1/2 h-[280px] w-[280px] -translate-y-1/2 rounded-full bg-bla-blue/20 blur-[100px]"
         aria-hidden
       />
 
@@ -59,7 +63,7 @@ export default function ToolsHub() {
             >
               <Link
                 href={tool.href}
-                className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-6 transition hover:border-bla-lime/35 hover:bg-white/[0.05] sm:p-7"
+                className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-6 transition hover:border-bla-lime/40 hover:bg-white/[0.06] hover:shadow-glow sm:p-7"
               >
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-bla-lime/80">
