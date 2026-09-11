@@ -1,25 +1,12 @@
 import type { Metadata } from "next";
-import { Syne, Manrope } from "next/font/google";
 import "./globals.css";
-
-const body = Manrope({
-  subsets: ["latin"],
-  variable: "--font-host",
-  weight: ["400", "500", "600", "700", "800"],
-});
-
-const display = Syne({
-  subsets: ["latin"],
-  variable: "--font-display",
-  weight: ["500", "600", "700", "800"],
-});
 
 export const metadata: Metadata = {
   title: {
-    default: "BlaBlaBuild Tools",
-    template: "%s — BlaBlaBuild Tools",
+    default: "Tools — blablabuild",
+    template: "%s — blablabuild tools",
   },
-  description: "Interne workshop- en presentatietools van BlaBlaBuild.",
+  description: "Workshop- en presentatietools van blablabuild.",
   robots: "noindex, nofollow",
 };
 
@@ -30,9 +17,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="nl">
-      <body className={`${body.variable} ${display.variable} font-host antialiased`}>
-        {children}
-      </body>
+      <head>
+        <link
+          href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@300;400;500;600;700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className="font-host antialiased">{children}</body>
     </html>
   );
 }

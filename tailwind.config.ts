@@ -9,8 +9,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        host: ["var(--font-host)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "var(--font-host)", "system-ui", "sans-serif"],
+        host: ["Host Grotesk", "system-ui", "sans-serif"],
+        sans: ["Host Grotesk", "system-ui", "sans-serif"],
+        display: ["Host Grotesk", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
         bla: {

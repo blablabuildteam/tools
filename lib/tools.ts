@@ -7,7 +7,6 @@ export type ToolMeta = {
   subtitle: string;
   blurb: string;
   badge: string;
-  accent: string;
 };
 
 export const TOOLS: ToolMeta[] = [
@@ -15,20 +14,16 @@ export const TOOLS: ToolMeta[] = [
     id: "ai-matrix",
     href: "/tools/ai-matrix",
     title: "AI Use Case Matrix",
-    subtitle: "Workshop scoring & prioritering",
-    blurb:
-      "Verzamel use cases live, plot impact × effort, prioriteer clusters en bouw roadmap + Claude-cases.",
-    badge: "Live",
-    accent: "#CEFF00",
+    subtitle: "Prioriteren",
+    blurb: "Use cases verzamelen, scoren en prioriteren in één workshop.",
+    badge: "Openen →",
   },
   {
     id: "workshop",
     href: "/tools/workshop",
     title: "Process Workshop",
-    subtitle: "Bord + schets",
-    blurb:
-      "Gestructureerd workshopbord van proces → oplossingen → tech-contouren, plus een vrij schetsvlak.",
-    badge: "Nieuw",
-    accent: "#7DD3FC",
+    subtitle: "Proces & schets",
+    blurb: "Proces uitwerken op het bord, vrij schetsen waar nodig.",
+    badge: "Openen →",
   },
 ];
