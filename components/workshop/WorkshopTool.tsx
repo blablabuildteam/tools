@@ -211,33 +211,44 @@ export default function WorkshopTool() {
     [sessionId]
   );
 
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
   const upsertCard = useCallback(
-    async (card: WorkshopCard) => {
-      const next = (() => {
-        const idx = cards.findIndex((c) => c.id === card.id);
+    (card: WorkshopCard, opts?: { immediate?: boolean }) => {
+      setCards((prev) => {
+        const idx = prev.findIndex((c) => c.id === card.id);
         if (idx >= 0) {
-          const copy = [...cards];
+          const copy = [...prev];
           copy[idx] = card;
           return copy;
         }
-        return [...cards, card];
-      })();
-      setCards(next);
+        return [...prev, card];
+      });
       if (!sessionId) return;
-      skipPoll.current = true;
-      try {
-        await fetch(`/api/workshop-sessions/${sessionId}`, {
+
+      const flush = () => {
+        skipPoll.current = true;
+        void fetch(`/api/workshop-sessions/${sessionId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "upsert-card", card }),
+        }).finally(() => {
+          setTimeout(() => {
+            skipPoll.current = false;
+          }, 800);
         });
-      } finally {
-        setTimeout(() => {
-          skipPoll.current = false;
-        }, 800);
+      };
+
+      if (opts?.immediate) {
+        if (saveTimers.current[card.id]) clearTimeout(saveTimers.current[card.id]);
+        flush();
+        return;
       }
+
+      if (saveTimers.current[card.id]) clearTimeout(saveTimers.current[card.id]);
+      saveTimers.current[card.id] = setTimeout(flush, 450);
     },
-    [cards, sessionId]
+    [sessionId]
   );
 
   const deleteCard = useCallback(
@@ -308,7 +319,7 @@ export default function WorkshopTool() {
       createdAt: now,
       updatedAt: now,
     };
-    void upsertCard(card);
+    upsertCard(card, { immediate: true });
   }
 
   if (landing || locked) {
@@ -520,7 +531,7 @@ export default function WorkshopTool() {
               cards={cards}
               author={author || "anon"}
               onAdd={addCard}
-              onChange={(card) => void upsertCard(card)}
+              onChange={(card) => upsertCard(card)}
               onDelete={(id) => void deleteCard(id)}
               onMove={(next) => void persistCards(next)}
             />

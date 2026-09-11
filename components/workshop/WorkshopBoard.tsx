@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, ThumbsUp, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { GripVertical, Plus, ThumbsUp, Trash2 } from "lucide-react";
 import type { WorkshopCard, WorkshopColumnId } from "@/lib/workshop-types";
 
 type Column = {
@@ -20,6 +20,30 @@ type Props = {
   onMove: (cards: WorkshopCard[]) => void;
 };
 
+type DropTarget = { columnId: WorkshopColumnId; index: number } | null;
+
+function reindex(cards: WorkshopCard[]): WorkshopCard[] {
+  const byCol = new Map<WorkshopColumnId, WorkshopCard[]>();
+  for (const c of cards) {
+    const list = byCol.get(c.columnId) ?? [];
+    list.push(c);
+    byCol.set(c.columnId, list);
+  }
+  const next: WorkshopCard[] = [];
+  for (const [, list] of byCol) {
+    list
+      .sort((a, b) => a.order - b.order)
+      .forEach((c, i) => {
+        next.push({ ...c, order: i });
+      });
+  }
+  // keep cards from unknown columns
+  for (const c of cards) {
+    if (!next.find((x) => x.id === c.id)) next.push(c);
+  }
+  return next;
+}
+
 export default function WorkshopBoard({
   columns,
   cards,
@@ -30,6 +54,8 @@ export default function WorkshopBoard({
   onMove,
 }: Props) {
   const [dragId, setDragId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget>(null);
+  const dragIdRef = useRef<string | null>(null);
 
   const byColumn = useMemo(() => {
     const map = new Map<WorkshopColumnId, WorkshopCard[]>();
@@ -42,26 +68,33 @@ export default function WorkshopBoard({
     return map;
   }, [cards, columns]);
 
-  function handleDrop(columnId: WorkshopColumnId) {
-    if (!dragId) return;
-    const card = cards.find((c) => c.id === dragId);
-    if (!card) return;
-    const targetList = (byColumn.get(columnId) ?? []).filter((c) => c.id !== dragId);
+  function applyMove(columnId: WorkshopColumnId, index: number) {
+    const id = dragIdRef.current;
+    if (!id) return;
+    const moving = cards.find((c) => c.id === id);
+    if (!moving) return;
+
+    const without = cards.filter((c) => c.id !== id);
+    const inTarget = without
+      .filter((c) => c.columnId === columnId)
+      .sort((a, b) => a.order - b.order);
+
+    const clamped = Math.max(0, Math.min(index, inTarget.length));
     const moved: WorkshopCard = {
-      ...card,
+      ...moving,
       columnId,
-      order: targetList.length,
+      order: clamped,
       updatedAt: new Date().toISOString(),
     };
-    const others = cards
-      .filter((c) => c.id !== dragId)
-      .map((c) =>
-        c.columnId === columnId && c.order >= moved.order
-          ? { ...c, order: c.order + 1 }
-          : c
-      );
-    onMove([...others, moved]);
-    setDragId(null);
+
+    const rebuiltTarget = [
+      ...inTarget.slice(0, clamped),
+      moved,
+      ...inTarget.slice(clamped),
+    ].map((c, i) => ({ ...c, order: i, columnId }));
+
+    const others = without.filter((c) => c.columnId !== columnId);
+    onMove(reindex([...others, ...rebuiltTarget]));
   }
 
   function toggleVote(card: WorkshopCard) {
@@ -70,21 +103,46 @@ export default function WorkshopBoard({
     onChange({ ...card, votes, updatedAt: new Date().toISOString() });
   }
 
+  function onColumnDragOver(e: React.DragEvent, columnId: WorkshopColumnId, index: number) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDropTarget({ columnId, index });
+  }
+
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] gap-3 p-4 sm:p-6">
+    <div className="flex min-h-[calc(100vh-7rem)] gap-3 overflow-x-auto p-4 sm:p-6">
       {columns.map((col) => {
         const list = byColumn.get(col.id) ?? [];
+        const isOverCol = dropTarget?.columnId === col.id;
+
         return (
           <section
             key={col.id}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={() => handleDrop(col.id)}
-            className="flex w-[280px] shrink-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03]"
+            onDragOver={(e) => {
+              e.preventDefault();
+              // drop at end when hovering empty / column chrome
+              if ((e.target as HTMLElement).closest("[data-card]")) return;
+              onColumnDragOver(e, col.id, list.length);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const index = dropTarget?.columnId === col.id ? dropTarget.index : list.length;
+              applyMove(col.id, index);
+              setDragId(null);
+              dragIdRef.current = null;
+              setDropTarget(null);
+            }}
+            onDragLeave={() => {
+              // keep indicator while inside children
+            }}
+            className={`flex w-[300px] shrink-0 flex-col rounded-2xl border bg-white/[0.03] transition ${
+              isOverCol ? "border-bla-lime/50 bg-bla-lime/[0.04]" : "border-white/10"
+            }`}
           >
             <div className="border-b border-white/10 px-3 py-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h3 className="font-display text-sm font-bold tracking-tight">{col.title}</h3>
+                  <h3 className="text-sm font-bold tracking-tight">{col.title}</h3>
                   <p className="mt-0.5 text-[11px] leading-snug text-bla-text-muted">{col.hint}</p>
                 </div>
                 <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] text-bla-text-muted">
@@ -100,68 +158,117 @@ export default function WorkshopBoard({
               </button>
             </div>
 
-            <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
-              {list.map((card) => (
-                <article
-                  key={card.id}
-                  draggable
-                  onDragStart={() => setDragId(card.id)}
-                  onDragEnd={() => setDragId(null)}
-                  className="cursor-grab rounded-xl border border-white/10 bg-bla-charcoal p-3 active:cursor-grabbing"
-                  style={{ boxShadow: `inset 3px 0 0 ${card.color}` }}
-                >
-                  <input
-                    value={card.title}
-                    onChange={(e) =>
-                      onChange({
-                        ...card,
-                        title: e.target.value,
-                        updatedAt: new Date().toISOString(),
-                      })
-                    }
-                    placeholder="Titel"
-                    className="w-full bg-transparent text-sm font-semibold outline-none placeholder:text-white/25"
-                  />
-                  <textarea
-                    value={card.body}
-                    onChange={(e) =>
-                      onChange({
-                        ...card,
-                        body: e.target.value,
-                        updatedAt: new Date().toISOString(),
-                      })
-                    }
-                    placeholder="Notitie…"
-                    rows={3}
-                    className="mt-1 w-full resize-none bg-transparent text-xs leading-relaxed text-bla-text-light outline-none placeholder:text-white/20"
-                  />
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <span className="truncate text-[10px] text-bla-text-muted">{card.author}</span>
-                    <div className="flex items-center gap-1">
+            <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
+              {list.map((card, index) => (
+                <div key={card.id}>
+                  {dropTarget?.columnId === col.id &&
+                    dropTarget.index === index &&
+                    dragId &&
+                    dragId !== card.id && (
+                      <div className="mb-1 h-1 rounded-full bg-bla-lime" />
+                    )}
+                  <article
+                    data-card
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      const before = e.clientY < rect.top + rect.height / 2;
+                      onColumnDragOver(e, col.id, before ? index : index + 1);
+                    }}
+                    className={`rounded-xl border border-white/10 bg-bla-charcoal transition ${
+                      dragId === card.id ? "opacity-40" : ""
+                    }`}
+                    style={{ boxShadow: `inset 3px 0 0 ${card.color}` }}
+                  >
+                    <div className="flex items-start gap-1 p-2 pb-0">
                       <button
                         type="button"
-                        onClick={() => toggleVote(card)}
-                        className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] ${
-                          card.votes.includes(author)
-                            ? "bg-bla-lime/20 text-bla-lime"
-                            : "text-bla-text-muted hover:text-white"
-                        }`}
+                        draggable
+                        onDragStart={(e) => {
+                          dragIdRef.current = card.id;
+                          setDragId(card.id);
+                          e.dataTransfer.effectAllowed = "move";
+                          e.dataTransfer.setData("text/plain", card.id);
+                          // ghost looks better without default text selection
+                          const ghost = e.currentTarget.parentElement?.parentElement;
+                          if (ghost) e.dataTransfer.setDragImage(ghost, 20, 20);
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          dragIdRef.current = null;
+                          setDropTarget(null);
+                        }}
+                        className="mt-1 cursor-grab rounded p-1 text-white/30 hover:bg-white/5 hover:text-white/70 active:cursor-grabbing"
+                        aria-label="Versleep kaart"
+                        title="Slepen"
                       >
-                        <ThumbsUp className="h-3 w-3" />
-                        {card.votes.length}
+                        <GripVertical className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(card.id)}
-                        className="rounded-md p-1 text-bla-text-muted hover:text-red-300"
-                        aria-label="Verwijder"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
+                      <input
+                        value={card.title}
+                        onChange={(e) =>
+                          onChange({
+                            ...card,
+                            title: e.target.value,
+                            updatedAt: new Date().toISOString(),
+                          })
+                        }
+                        placeholder="Titel"
+                        className="w-full bg-transparent py-1 pr-2 text-sm font-semibold outline-none placeholder:text-white/25"
+                      />
                     </div>
-                  </div>
-                </article>
+                    <div className="px-3 pb-2 pl-9">
+                      <textarea
+                        value={card.body}
+                        onChange={(e) =>
+                          onChange({
+                            ...card,
+                            body: e.target.value,
+                            updatedAt: new Date().toISOString(),
+                          })
+                        }
+                        placeholder="Notitie…"
+                        rows={3}
+                        className="w-full resize-y bg-transparent text-xs leading-relaxed text-bla-text-light outline-none placeholder:text-white/20"
+                      />
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="truncate text-[10px] text-bla-text-muted">{card.author}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => toggleVote(card)}
+                            className={`inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] ${
+                              card.votes.includes(author)
+                                ? "bg-bla-lime/20 text-bla-lime"
+                                : "text-bla-text-muted hover:text-white"
+                            }`}
+                          >
+                            <ThumbsUp className="h-3 w-3" />
+                            {card.votes.length}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(card.id)}
+                            className="rounded-md p-1 text-bla-text-muted hover:text-red-300"
+                            aria-label="Verwijder"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                </div>
               ))}
+              {dropTarget?.columnId === col.id && dropTarget.index === list.length && dragId && (
+                <div className="mt-1 h-1 rounded-full bg-bla-lime" />
+              )}
+              {list.length === 0 && (
+                <p className="px-2 py-6 text-center text-[11px] text-white/25">
+                  Sleep hierheen of voeg een kaart toe
+                </p>
+              )}
             </div>
           </section>
         );

@@ -13,16 +13,20 @@ export default function ToolsHub() {
         className="pointer-events-none absolute inset-0 bg-grid-faint bg-grid opacity-40"
         aria-hidden
       />
+      {/* Explicit blue / lime atmosphere (not only opacity utilities) */}
       <div
-        className="pointer-events-none absolute -left-32 top-0 h-[420px] w-[420px] rounded-full bg-bla-lime/10 blur-[120px]"
+        className="pointer-events-none absolute -left-32 top-0 h-[480px] w-[480px] rounded-full blur-[120px]"
+        style={{ background: "rgba(206, 255, 0, 0.12)" }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute -right-24 bottom-0 h-[420px] w-[420px] rounded-full bg-bla-blue/40 blur-[110px]"
+        className="pointer-events-none absolute -right-20 -top-10 h-[520px] w-[520px] rounded-full blur-[100px]"
+        style={{ background: "rgba(17, 37, 255, 0.45)" }}
         aria-hidden
       />
       <div
-        className="pointer-events-none absolute left-1/3 top-1/2 h-[280px] w-[280px] -translate-y-1/2 rounded-full bg-bla-blue/20 blur-[100px]"
+        className="pointer-events-none absolute bottom-0 left-1/4 h-[360px] w-[360px] rounded-full blur-[110px]"
+        style={{ background: "rgba(17, 37, 255, 0.28)" }}
         aria-hidden
       />
 
