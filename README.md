@@ -2,22 +2,29 @@
 
 Interne workshop- en presentatietools.
 
+**Live nu:** https://tools-lake-three.vercel.app  
+(Custom domain `tools.blablabuild.com` volgt zodra DNS in Hostinger staat.)
+
 ## Tools
 
-- **AI Use Case Matrix** (`/tools/ai-matrix`) — zelfde Vercel KV keys als blablabuild.com (`ai-matrix:{sessionId}`)
+- **AI Use Case Matrix** (`/tools/ai-matrix`) — zelfde Upstash KV als blablabuild.com (`ai-matrix:{sessionId}`)
 - **Process Workshop** (`/tools/workshop`) — gestructureerd bord + tldraw-schets (`workshop:{sessionId}`)
 
 ## Setup
 
 ```bash
-cp .env.example .env.local
-# Vul KV_REST_API_URL + KV_REST_API_TOKEN in (zelfde als blablabuild)
+npx vercel env pull .env.local
 npm install
 npm run dev
 ```
 
-## Deploy
+## Deploy / domain
 
-Koppel dit project aan `tools.blablabuild.com` op Vercel en hergebruik dezelfde KV/Upstash integration als de marketing site.
+Project: Vercel `blablabuild/tools`  
+KV: gedeelde store `upstash-kv-almond-castle` (zelfde als marketing site)
 
-Daarna op blablabuild.com een redirect zetten van `/tools/ai-matrix` → `https://tools.blablabuild.com/tools/ai-matrix`.
+Voor `tools.blablabuild.com` in Hostinger DNS:
+
+1. CNAME `tools` → `cname.vercel-dns.com`
+2. In Vercel: Project tools → Domains → add `tools.blablabuild.com`
+3. Daarna redirect in blablabuild `next.config.js` updaten naar `https://tools.blablabuild.com/...`
