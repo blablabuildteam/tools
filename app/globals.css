@@ -47,3 +47,35 @@ body {
 .tldraw-wrap .tl-container {
   height: 100%;
 }
+
+.workshop-sketch-canvas {
+  background: #f4f5f2;
+}
+
+.workshop-sketch-canvas .tl-background {
+  background-color: #f4f5f2 !important;
+}
+
+/* Quieter chrome: softer panels, less visual noise */
+.workshop-sketch-canvas .tlui-toolbar,
+.workshop-sketch-canvas .tlui-style-panel,
+.workshop-sketch-canvas .tlui-layout__top {
+  filter: none;
+}
+
+.workshop-sketch-canvas .tlui-button,
+.workshop-sketch-canvas .tlui-button__tool {
+  border-radius: 10px !important;
+}
+
+.workshop-sketch-canvas .tlui-toolbar__inner {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(21, 31, 40, 0.12) !important;
+  border: 1px solid rgba(21, 31, 40, 0.08) !important;
+}
+
+.workshop-sketch-canvas .tlui-style-panel {
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(21, 31, 40, 0.1) !important;
+  border: 1px solid rgba(21, 31, 40, 0.08) !important;
+}

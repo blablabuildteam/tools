@@ -68,12 +68,7 @@ export default function WorkshopTool() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const skipPoll = useRef(false);
-  const tabRef = useRef<Tab>("intro");
   const sketchDirty = useRef(false);
-
-  useEffect(() => {
-    tabRef.current = tab;
-  }, [tab]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -87,21 +82,28 @@ export default function WorkshopTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const applyPayload = useCallback((data: SessionPayload, opts?: { keepLocalSketch?: boolean }) => {
-    setMeta(data.meta);
-    setCards(data.cards ?? []);
-    if (!(opts?.keepLocalSketch && sketchDirty.current)) {
+  const applyPayload = useCallback(
+    (data: SessionPayload, opts?: { keepLocalSketch?: boolean; cardsOnly?: boolean }) => {
+      if (data.requiresPassword) {
+        setLocked(true);
+        return;
+      }
+      setLocked(false);
+      setMeta(data.meta);
+      setCards(data.cards ?? []);
+      setKv(Boolean(data.kv));
+      // Polls / background sync must never replace the live canvas snapshot
+      if (opts?.cardsOnly || opts?.keepLocalSketch || sketchDirty.current) return;
       setSketch(data.sketch ?? null);
-    }
-    setKv(Boolean(data.kv));
-    setLocked(Boolean(data.requiresPassword));
-  }, []);
+    },
+    []
+  );
 
   const loadSession = useCallback(
-    async (sid: string) => {
+    async (sid: string, opts?: { cardsOnly?: boolean }) => {
       const res = await fetch(`/api/workshop-sessions/${sid}`);
       const data = (await res.json()) as SessionPayload;
-      applyPayload(data);
+      applyPayload(data, opts);
       return data;
     },
     [applyPayload]
@@ -192,18 +194,14 @@ export default function WorkshopTool() {
     const t = setInterval(async () => {
       if (skipPoll.current) return;
       try {
-        const data = await loadSession(sessionId);
-        // Never apply a locked/empty poll — that wipes a successful unlock
-        if (data.requiresPassword) return;
-        applyPayload(data, {
-          keepLocalSketch: tabRef.current === "sketch" || sketchDirty.current,
-        });
+        // Only sync board cards/meta — never touch sketch (causes canvas flash)
+        await loadSession(sessionId, { cardsOnly: true });
       } catch {
         /* ignore */
       }
-    }, 5000);
+    }, 8000);
     return () => clearInterval(t);
-  }, [landing, sessionId, locked, loadSession, applyPayload]);
+  }, [landing, sessionId, locked, loadSession]);
 
   const persistCards = useCallback(
     async (next: WorkshopCard[]) => {
@@ -287,22 +285,19 @@ export default function WorkshopTool() {
   );
 
   const saveSketch = useCallback(
-    async (nextSketch: unknown) => {
+    (nextSketch: unknown) => {
       sketchDirty.current = true;
-      // Keep parent sketch in sync for first load only — don't force remount
       if (!sessionId) return;
       skipPoll.current = true;
-      try {
-        await fetch(`/api/workshop-sessions/${sessionId}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save-sketch", sketch: nextSketch }),
-        });
-      } finally {
+      void fetch(`/api/workshop-sessions/${sessionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save-sketch", sketch: nextSketch }),
+      }).finally(() => {
         setTimeout(() => {
           skipPoll.current = false;
-        }, 1500);
-      }
+        }, 2000);
+      });
     },
     [sessionId]
   );
@@ -556,16 +551,12 @@ export default function WorkshopTool() {
           />
         </div>
 
-        <div className={`absolute inset-0 ${tab === "sketch" ? "block" : "hidden"}`}>
-          {tab === "sketch" && (
-            <WorkshopSketch
-              sessionId={sessionId}
-              initialSketch={sketch}
-              onSave={(s) => void saveSketch(s)}
-              active
-            />
-          )}
-        </div>
+        {/* Keep mounted so poll/tab switches don't remount tldraw */}
+        <WorkshopSketch
+          initialSketch={sketch}
+          onSave={saveSketch}
+          active={tab === "sketch"}
+        />
       </div>
     </div>
   );
