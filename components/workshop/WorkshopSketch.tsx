@@ -1,89 +1,116 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Tldraw,
   createTLStore,
   getSnapshot,
   loadSnapshot,
+  type TLStore,
   type TLStoreSnapshot,
 } from "tldraw";
 import "tldraw/tldraw.css";
+
+const Tldraw = dynamic(async () => (await import("tldraw")).Tldraw, {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full items-center justify-center text-sm text-white/50">
+      Schets laden…
+    </div>
+  ),
+});
 
 type Props = {
   sessionId: string;
   initialSketch: unknown | null;
   onSave: (sketch: unknown) => void;
-  /** When false, canvas stays mounted but hidden — prevents tldraw teardown crashes */
   active: boolean;
 };
 
-class ErrorCatch extends React.Component<
-  { children: React.ReactNode; onError: () => void },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
+function normalizeSnapshot(raw: unknown): TLStoreSnapshot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  // Already a full editor snapshot
+  if (obj.document && typeof obj.document === "object") {
+    return obj as unknown as TLStoreSnapshot;
   }
-
-  componentDidCatch() {
-    this.props.onError();
+  // Raw store snapshot { store, schema }
+  if (obj.store && obj.schema) {
+    return { document: obj } as unknown as TLStoreSnapshot;
   }
-
-  render() {
-    if (this.state.hasError) return null;
-    return this.props.children;
-  }
+  return null;
 }
 
 /**
- * Stable tldraw host:
- * - store created once
- * - snapshot loaded once
- * - onSave via ref (no effect churn)
- * - stays mounted while inactive (CSS hide)
+ * Mount tldraw only while the Schets tab is active.
+ * Load snapshot once data is available. Persist document-only snapshots.
  */
-export default function WorkshopSketch({ sessionId, initialSketch, onSave, active }: Props) {
-  const storeRef = useRef(createTLStore());
-  const onSaveRef = useRef(onSave);
-  const loadedRef = useRef(false);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+export default function WorkshopSketch({ initialSketch, onSave, active }: Props) {
+  const [store] = useState<TLStore>(() => createTLStore());
   const [ready, setReady] = useState(false);
-  const [crashed, setCrashed] = useState(false);
-  const [mountKey, setMountKey] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+  const onSaveRef = useRef(onSave);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onSaveRef.current = onSave;
   }, [onSave]);
 
+  // Load when sketch data arrives (don't mark loaded on null)
   useEffect(() => {
     if (loadedRef.current) return;
-    loadedRef.current = true;
-    try {
-      if (initialSketch && typeof initialSketch === "object") {
-        loadSnapshot(storeRef.current, initialSketch as TLStoreSnapshot);
-      }
-    } catch {
-      // bad snapshot — start empty rather than crash
+    if (initialSketch == null) {
+      // Still waiting for session payload — keep waiting
+      return;
     }
-    setReady(true);
+    try {
+      const snap = normalizeSnapshot(initialSketch);
+      if (snap) {
+        loadSnapshot(store, snap);
+      }
+      loadedRef.current = true;
+      setReady(true);
+      setError(null);
+    } catch (e) {
+      console.error("sketch load failed", e);
+      loadedRef.current = true;
+      setReady(true);
+      setError("Schets kon niet geladen worden — lege canvas gestart.");
+    }
+  }, [initialSketch, store]);
+
+  // If no sketch ever arrives, still show empty canvas after short wait handled by parent having sketch
+  useEffect(() => {
+    if (loadedRef.current) return;
+    if (initialSketch !== null) return;
+    const t = setTimeout(() => {
+      if (!loadedRef.current) {
+        loadedRef.current = true;
+        setReady(true);
+      }
+    }, 2500);
+    return () => clearTimeout(t);
   }, [initialSketch]);
 
   useEffect(() => {
-    if (!ready || crashed) return;
-    const store = storeRef.current;
+    if (!ready || !active) return;
     const unsub = store.listen(
       () => {
         if (saveTimer.current) clearTimeout(saveTimer.current);
         saveTimer.current = setTimeout(() => {
           try {
-            onSaveRef.current(getSnapshot(store));
-          } catch {
-            /* ignore */
+            // Prefer full snapshot when session exists; fall back to document-only
+            try {
+              onSaveRef.current(getSnapshot(store));
+            } catch {
+              const raw = store.getStoreSnapshot();
+              onSaveRef.current({ document: { store: raw.store, schema: raw.schema } });
+            }
+          } catch (e) {
+            console.error("sketch save failed", e);
           }
-        }, 1200);
+        }, 1000);
       },
       { source: "user", scope: "document" }
     );
@@ -91,52 +118,37 @@ export default function WorkshopSketch({ sessionId, initialSketch, onSave, activ
       unsub();
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [ready, crashed, mountKey]);
+  }, [ready, active, store]);
 
-  const recover = useCallback(() => {
-    setCrashed(false);
-    setMountKey((k) => k + 1);
-    setReady(true);
+  const onMount = useCallback((editor: { updateViewportScreenBounds?: (force?: boolean) => void }) => {
+    try {
+      // force recalculate after tab becomes visible
+      editor.updateViewportScreenBounds?.(true);
+      requestAnimationFrame(() => editor.updateViewportScreenBounds?.(true));
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  if (crashed) {
-    return (
-      <div
-        className={`${active ? "relative" : "hidden"} flex h-full min-h-[480px] flex-col items-center justify-center gap-3 text-sm text-bla-text-muted`}
-      >
-        <p>Schets even vastgelopen.</p>
-        <button
-          type="button"
-          onClick={recover}
-          className="rounded-lg bg-bla-lime px-4 py-2 text-xs font-semibold text-bla-dark"
-        >
-          Opnieuw laden
-        </button>
-      </div>
-    );
-  }
+  if (!active) return null;
 
   return (
-    <div
-      className={`${active ? "relative" : "pointer-events-none invisible absolute inset-0"} h-full min-h-[480px] w-full`}
-      aria-hidden={!active}
-    >
+    <div className="absolute inset-0 bg-white">
       {!ready ? (
-        <div className="flex h-full items-center justify-center text-sm text-bla-text-muted">
+        <div className="flex h-full items-center justify-center text-sm text-bla-dark/60">
           Schets laden…
         </div>
       ) : (
-        <div className="tldraw-wrap">
-          <ErrorCatch onError={() => setCrashed(true)}>
-            <Tldraw
-              key={`tldraw-${sessionId}-${mountKey}`}
-              store={storeRef.current}
-              onMount={() => {
-                /* store already loaded; keep mount lightweight */
-              }}
-            />
-          </ErrorCatch>
-        </div>
+        <>
+          {error && (
+            <div className="absolute left-3 top-3 z-20 rounded-lg bg-amber-100 px-3 py-1.5 text-xs text-amber-900">
+              {error}
+            </div>
+          )}
+          <div className="tldraw-wrap">
+            <Tldraw store={store} onMount={onMount as never} />
+          </div>
+        </>
       )}
     </div>
   );

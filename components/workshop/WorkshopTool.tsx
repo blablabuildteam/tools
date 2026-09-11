@@ -22,7 +22,6 @@ import {
   createEmptyIntro,
   type WorkshopCard,
   type WorkshopColumnId,
-  type WorkshopIntro,
   type WorkshopMeta,
 } from "@/lib/workshop-types";
 import WorkshopBoard from "@/components/workshop/WorkshopBoard";
@@ -308,24 +307,6 @@ export default function WorkshopTool() {
     [sessionId]
   );
 
-  const saveIntro = useCallback(
-    (intro: WorkshopIntro) => {
-      setMeta((prev) => (prev ? { ...prev, intro } : prev));
-      if (!sessionId) return;
-      skipPoll.current = true;
-      void fetch(`/api/workshop-sessions/${sessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "update-intro", intro }),
-      }).finally(() => {
-        setTimeout(() => {
-          skipPoll.current = false;
-        }, 800);
-      });
-    },
-    [sessionId]
-  );
-
   const shareUrl = useMemo(() => {
     if (typeof window === "undefined" || !sessionId) return "";
     return `${window.location.origin}/tools/workshop?s=${sessionId}`;
@@ -559,9 +540,7 @@ export default function WorkshopTool() {
         <div className={`h-full overflow-y-auto ${tab === "intro" ? "" : "hidden"}`}>
           <WorkshopIntroView
             intro={meta?.intro ?? createEmptyIntro()}
-            author={author}
-            onChange={saveIntro}
-            onStartBoard={() => setTab("board")}
+            onContinue={() => setTab("sketch")}
           />
         </div>
 
@@ -577,14 +556,15 @@ export default function WorkshopTool() {
           />
         </div>
 
-        {/* Keep sketch mounted to avoid tldraw teardown / blank screen */}
-        <div className={`absolute inset-0 ${tab === "sketch" ? "" : "pointer-events-none invisible"}`}>
-          <WorkshopSketch
-            sessionId={sessionId}
-            initialSketch={sketch}
-            onSave={(s) => void saveSketch(s)}
-            active={tab === "sketch"}
-          />
+        <div className={`absolute inset-0 ${tab === "sketch" ? "block" : "hidden"}`}>
+          {tab === "sketch" && (
+            <WorkshopSketch
+              sessionId={sessionId}
+              initialSketch={sketch}
+              onSave={(s) => void saveSketch(s)}
+              active
+            />
+          )}
         </div>
       </div>
     </div>
