@@ -1,9 +1,8 @@
-# BlaBlaBuild Tools — tools.blablabuild.com
+# BlaBlaBuild Tools
+
+**Live:** https://tools.blablabuild.com
 
 Interne workshop- en presentatietools.
-
-**Live nu:** https://tools-lake-three.vercel.app  
-(Custom domain `tools.blablabuild.com` volgt zodra DNS in Hostinger staat.)
 
 ## Tools
 
@@ -18,13 +17,6 @@ npm install
 npm run dev
 ```
 
-## Deploy / domain
+## Deploy
 
-Project: Vercel `blablabuild/tools`  
-KV: gedeelde store `upstash-kv-almond-castle` (zelfde als marketing site)
-
-Voor `tools.blablabuild.com` in Hostinger DNS:
-
-1. CNAME `tools` → `cname.vercel-dns.com`
-2. In Vercel: Project tools → Domains → add `tools.blablabuild.com`
-3. Daarna redirect in blablabuild `next.config.js` updaten naar `https://tools.blablabuild.com/...`
+Vercel project `blablabuild/tools`, domain `tools.blablabuild.com`, shared KV store `upstash-kv-almond-castle`.
