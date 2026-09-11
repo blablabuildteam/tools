@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bla-lime: #ceff00;
+  --bla-blue: #1125ff;
+  --bla-dark: #151f28;
+  --bla-charcoal: #1a1a1a;
+  --bla-charcoal-light: #2a2a2a;
+  --bla-charcoal-border: #333333;
+  --bla-gray: #f9fafb;
+  --bla-gray-light: #f3f4f6;
+  --bla-border: #e5e7eb;
+  --bla-text-light: #e5e5e5;
+  --bla-text-muted: #999999;
+  --bla-lavender: #e7e8ff;
+  --bla-white: #fbfcfa;
+  --bla-text-gray: #9e9e96;
+  --background: #10151b;
+  --foreground: #fbfcfa;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-host), system-ui, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* tldraw needs a sized container */
+.tldraw-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.tldraw-wrap .tl-container {
+  height: 100%;
+}
