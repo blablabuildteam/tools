@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowLeft,
   Check,
@@ -14,19 +13,23 @@ import {
   RefreshCw,
   Share2,
   Unlock,
+  BookOpen,
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import {
   CARD_COLORS,
   WORKSHOP_COLUMNS,
+  createEmptyIntro,
   type WorkshopCard,
   type WorkshopColumnId,
+  type WorkshopIntro,
   type WorkshopMeta,
 } from "@/lib/workshop-types";
 import WorkshopBoard from "@/components/workshop/WorkshopBoard";
 import WorkshopSketch from "@/components/workshop/WorkshopSketch";
+import WorkshopIntroView from "@/components/workshop/WorkshopIntroView";
 
-type Tab = "board" | "sketch";
+type Tab = "intro" | "board" | "sketch";
 
 type SessionPayload = {
   meta: Omit<WorkshopMeta, "passwordHash">;
@@ -56,7 +59,7 @@ export default function WorkshopTool() {
   const [author, setAuthor] = useState("");
   const [password, setPassword] = useState("");
   const [unlockPassword, setUnlockPassword] = useState("");
-  const [tab, setTab] = useState<Tab>("board");
+  const [tab, setTab] = useState<Tab>("intro");
   const [meta, setMeta] = useState<Omit<WorkshopMeta, "passwordHash"> | null>(null);
   const [cards, setCards] = useState<WorkshopCard[]>([]);
   const [sketch, setSketch] = useState<unknown | null>(null);
@@ -66,6 +69,12 @@ export default function WorkshopTool() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const skipPoll = useRef(false);
+  const tabRef = useRef<Tab>("intro");
+  const sketchDirty = useRef(false);
+
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -79,10 +88,12 @@ export default function WorkshopTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const applyPayload = useCallback((data: SessionPayload) => {
+  const applyPayload = useCallback((data: SessionPayload, opts?: { keepLocalSketch?: boolean }) => {
     setMeta(data.meta);
     setCards(data.cards ?? []);
-    setSketch(data.sketch ?? null);
+    if (!(opts?.keepLocalSketch && sketchDirty.current)) {
+      setSketch(data.sketch ?? null);
+    }
     setKv(Boolean(data.kv));
     setLocked(Boolean(data.requiresPassword));
   }, []);
@@ -183,7 +194,12 @@ export default function WorkshopTool() {
       if (skipPoll.current) return;
       try {
         const data = await loadSession(sessionId);
-        if (!data.requiresPassword) applyPayload(data);
+        if (!data.requiresPassword) {
+          // Never clobber an in-progress sketch from a poll
+          applyPayload(data, {
+            keepLocalSketch: tabRef.current === "sketch" || sketchDirty.current,
+          });
+        }
       } catch {
         /* ignore */
       }
@@ -274,7 +290,8 @@ export default function WorkshopTool() {
 
   const saveSketch = useCallback(
     async (nextSketch: unknown) => {
-      setSketch(nextSketch);
+      sketchDirty.current = true;
+      // Keep parent sketch in sync for first load only — don't force remount
       if (!sessionId) return;
       skipPoll.current = true;
       try {
@@ -286,8 +303,26 @@ export default function WorkshopTool() {
       } finally {
         setTimeout(() => {
           skipPoll.current = false;
-        }, 1200);
+        }, 1500);
       }
+    },
+    [sessionId]
+  );
+
+  const saveIntro = useCallback(
+    (intro: WorkshopIntro) => {
+      setMeta((prev) => (prev ? { ...prev, intro } : prev));
+      if (!sessionId) return;
+      skipPoll.current = true;
+      void fetch(`/api/workshop-sessions/${sessionId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update-intro", intro }),
+      }).finally(() => {
+        setTimeout(() => {
+          skipPoll.current = false;
+        }, 800);
+      });
     },
     [sessionId]
   );
@@ -438,8 +473,8 @@ export default function WorkshopTool() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-bla-dark text-bla-white">
-      <header className="sticky top-0 z-20 border-b border-white/10 bg-bla-dark/90 backdrop-blur">
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-bla-dark text-bla-white">
+      <header className="z-20 shrink-0 border-b border-white/10 bg-bla-dark/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <Link
             href="/"
@@ -448,7 +483,7 @@ export default function WorkshopTool() {
             <ArrowLeft className="h-3.5 w-3.5" /> Hub
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-base font-bold tracking-tight">
+            <p className="truncate text-base font-bold tracking-tight">
               {meta?.title || "Process workshop"}
               {meta?.company ? (
                 <span className="ml-2 text-sm font-medium text-bla-lime">{meta.company}</span>
@@ -462,6 +497,15 @@ export default function WorkshopTool() {
           </div>
 
           <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-1">
+            <button
+              type="button"
+              onClick={() => setTab("intro")}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                tab === "intro" ? "bg-bla-lime text-bla-dark" : "text-bla-text-muted hover:text-white"
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" /> Intro
+            </button>
             <button
               type="button"
               onClick={() => setTab("board")}
@@ -510,48 +554,40 @@ export default function WorkshopTool() {
             <Copy className="h-3.5 w-3.5" /> Code
           </button>
         </div>
-        {meta?.goal && (
-          <div className="border-t border-white/5 px-4 py-2 text-[11px] text-bla-text-muted sm:px-6">
-            Scope: {meta.goal}
-          </div>
-        )}
       </header>
 
-      <AnimatePresence mode="wait">
-        {tab === "board" ? (
-          <motion.div
-            key="board"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex-1 overflow-x-auto"
-          >
-            <WorkshopBoard
-              columns={[...WORKSHOP_COLUMNS]}
-              cards={cards}
-              author={author || "anon"}
-              onAdd={addCard}
-              onChange={(card) => upsertCard(card)}
-              onDelete={(id) => void deleteCard(id)}
-              onMove={(next) => void persistCards(next)}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="sketch"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="relative flex-1"
-          >
-            <WorkshopSketch
-              sessionId={sessionId}
-              initialSketch={sketch}
-              onSave={(s) => void saveSketch(s)}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className={`h-full overflow-y-auto ${tab === "intro" ? "" : "hidden"}`}>
+          <WorkshopIntroView
+            intro={meta?.intro ?? createEmptyIntro()}
+            author={author}
+            onChange={saveIntro}
+            onStartBoard={() => setTab("board")}
+          />
+        </div>
+
+        <div className={`h-full overflow-x-auto ${tab === "board" ? "" : "hidden"}`}>
+          <WorkshopBoard
+            columns={[...WORKSHOP_COLUMNS]}
+            cards={cards}
+            author={author || "anon"}
+            onAdd={addCard}
+            onChange={(card) => upsertCard(card)}
+            onDelete={(id) => void deleteCard(id)}
+            onMove={(next) => void persistCards(next)}
+          />
+        </div>
+
+        {/* Keep sketch mounted to avoid tldraw teardown / blank screen */}
+        <div className={`absolute inset-0 ${tab === "sketch" ? "" : "pointer-events-none invisible"}`}>
+          <WorkshopSketch
+            sessionId={sessionId}
+            initialSketch={sketch}
+            onSave={(s) => void saveSketch(s)}
+            active={tab === "sketch"}
+          />
+        </div>
+      </div>
     </div>
   );
 }

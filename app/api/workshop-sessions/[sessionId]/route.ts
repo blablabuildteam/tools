@@ -5,6 +5,7 @@ import {
   createEmptyMeta,
   publicMeta,
   type WorkshopCard,
+  type WorkshopIntro,
   type WorkshopMeta,
   type WorkshopSession,
 } from "@/lib/workshop-types";
@@ -117,6 +118,10 @@ type Body =
       password?: string | null;
     }
   | {
+      action: "update-intro";
+      intro: WorkshopIntro;
+    }
+  | {
       action: "upsert-card";
       card: WorkshopCard;
     }
@@ -202,9 +207,11 @@ export async function PUT(
 
     if (body.action === "update-meta") {
       const nextPassword = body.password;
+      const incomingIntro = body.meta.intro;
       session.meta = {
         ...session.meta,
         ...body.meta,
+        intro: incomingIntro ?? session.meta.intro,
         passwordHash: session.meta.passwordHash,
         passwordProtected: session.meta.passwordProtected,
       };
@@ -215,6 +222,15 @@ export async function PUT(
         session.meta.passwordProtected = true;
         session.meta.passwordHash = hashPassword(nextPassword.trim());
       }
+      await saveSession(params.sessionId, session);
+      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+    }
+
+    if (body.action === "update-intro") {
+      session.meta = {
+        ...session.meta,
+        intro: body.intro,
+      };
       await saveSession(params.sessionId, session);
       return NextResponse.json({ ok: true, ...clientPayload(session, true) });
     }

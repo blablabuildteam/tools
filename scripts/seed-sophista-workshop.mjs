@@ -1,5 +1,5 @@
 /**
- * Seed Sophista Process Workshop session into Vercel KV.
+ * Seed / reset Sophista workshop as a FACILITATION board (not a doc dump).
  * Run: node scripts/seed-sophista-workshop.mjs
  */
 import { readFileSync } from "fs";
@@ -38,7 +38,7 @@ function card(partial, order) {
     columnId: partial.columnId,
     title: partial.title,
     body: partial.body,
-    author: partial.author || "blablabuild",
+    author: "facilitator",
     votes: [],
     color: partial.color || "#CEFF00",
     order,
@@ -47,272 +47,135 @@ function card(partial, order) {
   };
 }
 
+/**
+ * Sparse prompt cards — the group fills the board live.
+ * Sophista AI-use cases only as short options to prioritize in column 5.
+ */
 const cards = [
-  // DOEL
   card(
     {
-      id: "goal-1",
+      id: "g1",
       columnId: "goal",
-      title: "Doel van de samenwerking",
-      body: "Samen met Sophista onderzoeken hoe AI en automatisering het bedrijfsverkoopproces kunnen ondersteunen — van procesanalyse naar concrete oplossingsrichtingen en eerste technische contouren.",
+      title: "Startpunt samenwerking",
+      body: "Onderzoeken hoe AI/automatisering het bedrijfsverkoopproces van Sophista kan ondersteunen — beginnend bij de voorbereidingsfase.",
       color: "#CEFF00",
     },
     0
   ),
   card(
     {
-      id: "goal-2",
+      id: "g2",
       columnId: "goal",
-      title: "Scope fase 1 (afgebakend)",
-      body: "Van binnenkomende informatie → verwerking & analyse → eerste gestandaardiseerde rapport.\n\nFocus: voorbereidingsfase van het verkoopproces (niet meteen marketing / DD / signing).",
+      title: "Scope vandaag",
+      body: "Alleen: inkomende info → verwerking/analyse → eerste gestandaardiseerde rapport.\n\nVraag aan de groep: klopt deze afbakening?",
       color: "#CEFF00",
     },
     1
   ),
-  card(
-    {
-      id: "goal-3",
-      columnId: "goal",
-      title: "Out of scope (nu)",
-      body: "Volledige marketingfase, due diligence dataroom, SPA/onderhandelingen. Wel kort meenemen als ‘Later’, zodat fase 1 niet losstaat van vervolg.",
-      color: "#FDBA74",
-    },
-    2
-  ),
 
-  // INKOMEND
   card(
     {
-      id: "in-1",
+      id: "i1",
       columnId: "incoming",
-      title: "Klant & deal-input",
-      body: "Ontvangen klantgegevens, businessplan, notities/notulen van besprekingen, interne transactiedossiers, templates, kennisbank.",
+      title: "Vragen om samen te beantwoorden",
+      body: "• Welke documenten/bronnen komen binnen bij een nieuwe deal?\n• Wat komt van de klant vs. wat zoeken jullie zelf?\n• Wat mist er vaak?",
       color: "#7DD3FC",
     },
     0
   ),
-  card(
-    {
-      id: "in-2",
-      columnId: "incoming",
-      title: "Externe bronnen",
-      body: "Company.info (licentie), Gain.pro / LongListMaker, overige publieke bronnen. Agent moet ook zelf analyses kunnen doen naast aangeleverde docs.",
-      color: "#7DD3FC",
-    },
-    1
-  ),
-  card(
-    {
-      id: "in-3",
-      columnId: "incoming",
-      title: "Sophista-standaarden",
-      body: "Historische IMs, huisstijl/kleuren, prompts (concept IM-prompt), NDA-template, teaser-format.",
-      color: "#7DD3FC",
-    },
-    2
-  ),
 
-  // PROCES
   card(
     {
-      id: "proc-1",
+      id: "p1",
       columnId: "process",
-      title: "Voorbereidingsfase — stappen Sophista",
-      body: "1) Strategie / bedrijfsverkenning / marktanalyse\n2) KPI’s & waardedrijvers\n3) Financiële prognoses\n4) Indicatieve waardebepaling (APV)\n5) Informatiememorandum\n6) Procesbrieven & NDA\n7) Teaser / anoniem profiel\n8) Longlist → shortlist kopers",
+      title: "Vragen om samen te beantwoorden",
+      body: "• Wie doet wat, in welke volgorde?\n• Welke stappen kosten de meeste tijd?\n• Waar gaan kwaliteit of consistentie mis?",
       color: "#A78BFA",
     },
     0
   ),
-  card(
-    {
-      id: "proc-2",
-      columnId: "process",
-      title: "Kernflow fase 1 (workshop-scope)",
-      body: "Inkomend dossier + bronnen → structureren & analyseren → gestandaardiseerde output (analyse / eerste rapport / bouwsteen richting IM).",
-      color: "#A78BFA",
-    },
-    1
-  ),
-  card(
-    {
-      id: "proc-3",
-      columnId: "process",
-      title: "Pijnpunten (te valideren dinsdag)",
-      body: "Handmatig verzamelen & herschrijven • inconsistentie tussen dossiers • tijd naar eerste bruikbare IM/teaser • koppeling kennisbank/templates • kwaliteit vs. snelheid • ‘lerend vermogen’ van prompts ontbreekt nog.",
-      color: "#F9A8D4",
-    },
-    2
-  ),
 
-  // RAPPORT
   card(
     {
-      id: "rep-1",
+      id: "r1",
       columnId: "report",
-      title: "Bedrijfsanalyse (1-klik)",
-      body: "Algemene omschrijving, historie, producten/diensten, geo, klanten, USP’s, ketenpositie, eigenaarsstructuur, financiële kengetallen, overnamegeschiedenis — deels via Company.info.",
+      title: "Vragen om samen te beantwoorden",
+      body: "• Wat is de eerste bruikbare ‘standaard output’ (niet meteen een volledig IM)?\n• Voor wie is die output?\n• Wanneer is die ‘goed genoeg’?",
       color: "#86EFAC",
     },
     0
   ),
-  card(
-    {
-      id: "rep-2",
-      columnId: "report",
-      title: "Marktanalyse",
-      body: "Marktinrichting, trends, regelgeving, groei/groeidrijvers, ketenoverzicht, concurrentie + marktaandeel-inschatting, gefragmenteerd vs. geconsolideerd.",
-      color: "#86EFAC",
-    },
-    1
-  ),
-  card(
-    {
-      id: "rep-3",
-      columnId: "report",
-      title: "IM als doel-output (richting)",
-      body: "PowerPoint-structuur 20–30 slides: exec summary, investment highlights, legal/transactiemotivatie, producten, markt, klanten, operatie, management, finance (beperkt), projecties, case, risico’s.\n\nKwaliteitseis: koper-vragen beantwoordbaar (propositie, model, value drivers, risico’s, schaalbaarheid).",
-      color: "#86EFAC",
-    },
-    2
-  ),
 
-  // OPLOSSINGEN
   card(
     {
-      id: "sol-1",
+      id: "s1",
       columnId: "solutions",
-      title: "UC1 — Bedrijfsverkenning agent",
-      body: "Automatische enterprise scan op basis van dossier + publieke bronnen. Relatief startbaar; sterke afhankelijkheid van bron-kwaliteit en licenties.",
+      title: "Opties uit Sophista-inventarisatie",
+      body: "Kort stemmen / rangschikken (niet uitwerken):\n1 Bedrijfsverkenning\n2 Marktanalyse\n3 IM-generator\n4 NDA personaliseren\n5 Teaser uit IM\n6 Longlist / buyer dashboard\n\nVoeg eigen kaarten toe voor nieuwe ideeën.",
       color: "#FCD34D",
     },
     0
   ),
-  card(
-    {
-      id: "sol-2",
-      columnId: "solutions",
-      title: "UC2 — Marktanalyse agent",
-      body: "Markt/trends/concurrentie in gestandaardiseerd format. Bouwt voort op UC1; output voedt IM.",
-      color: "#FCD34D",
-    },
-    1
-  ),
-  card(
-    {
-      id: "sol-3",
-      columnId: "solutions",
-      title: "UC3 — IM generator (kernambition)",
-      body: "Map met bronnen woord-voor-woord analyseren + eigen analyses + eerdere IMs. Stap-voor-stap met controle. Concept prompt bestaat al. Belangrijk: templates, kennisbank, transactiedossiers + lerend vermogen.",
-      color: "#FCD34D",
-    },
-    2
-  ),
-  card(
-    {
-      id: "sol-4",
-      columnId: "solutions",
-      title: "UC4 — NDA personaliseren",
-      body: "Standaard NDA + aanhef/tekeningsbevoegde uit Company.info. Relatief eenvoudige automatisering.",
-      color: "#FCD34D",
-    },
-    3
-  ),
-  card(
-    {
-      id: "sol-5",
-      columnId: "solutions",
-      title: "UC5 — Teaser uit IM",
-      body: "Anoniem profiel / teaser afleiden uit goedgekeurd IM.",
-      color: "#FCD34D",
-    },
-    4
-  ),
-  card(
-    {
-      id: "sol-6",
-      columnId: "solutions",
-      title: "UC6 — Longlist / buyer dashboard",
-      body: "Categorieën (NL/Benelux/EU/wereld), Gain.pro / Longlistmaker / Company.info, koppeling bedrijfsverkenning, Excel-onderlaag, klanttoegang met beveiliging.",
-      color: "#FCD34D",
-    },
-    5
-  ),
 
-  // TECH
   card(
     {
-      id: "tech-1",
+      id: "t1",
       columnId: "tech",
-      title: "Bouwblokken (contour)",
-      body: "• Document-ingest (map/dossier)\n• Retrieval over kennisbank + historische IMs\n• Prompt/skill-laag met review-stappen\n• Bron-connectors (Company.info e.d.)\n• Output naar PPTX / gestructureerde slides\n• Feedback-loop (‘lerend vermogen’) op edits van adviseurs",
+      title: "Na prioritering invullen",
+      body: "Voor de #1 richting: welke bouwblokken zijn nodig (bronnen, templates, review-stap, output-format)?",
       color: "#CEFF00",
     },
     0
   ),
-  card(
-    {
-      id: "tech-2",
-      columnId: "tech",
-      title: "Niet-functionele eisen",
-      body: "Vertrouwelijkheid dealdata • bronvermelding / aannames markeren • mens-in-de-loop goedkeuring vóór externe output • audit trail wie wat wijzigde.",
-      color: "#CEFF00",
-    },
-    1
-  ),
-  card(
-    {
-      id: "tech-3",
-      columnId: "tech",
-      title: "IM-prompt — aandachtspunten",
-      body: "Conceptprompt: M&A-stijl, NL/EN, slide-by-slide, Sophista kleuren/fonts. Workshop: waar faalt dit zonder interne docs? Wat moet retrieval/template-laag toevoegen?",
-      color: "#7DD3FC",
-    },
-    2
-  ),
 
-  // LATER
   card(
     {
-      id: "lat-1",
+      id: "l1",
       columnId: "later",
-      title: "Marketingfase",
-      body: "Shortlist benaderen, NDA’s, IM verstrekken, management presentations, indicatieve biedingen, LOI.",
+      title: "Even parkeren",
+      body: "Marketingfase, DD, signing — kort noemen zodat fase 1 niet losstaat, niet uitwerken vandaag.",
       color: "#FDBA74",
     },
     0
-  ),
-  card(
-    {
-      id: "lat-2",
-      columnId: "later",
-      title: "Due Diligence",
-      body: "VDR opzetten, Q&A, bevindingen, onderhandelingen uitkomsten.",
-      color: "#FDBA74",
-    },
-    1
-  ),
-  card(
-    {
-      id: "lat-3",
-      columnId: "later",
-      title: "Signing & Closing",
-      body: "SPA & documentatie, notaris, persbericht — vooral juridisch/extern; lagere AI-prioriteit in fase 1.",
-      color: "#FDBA74",
-    },
-    2
   ),
 ];
 
 const now = new Date().toISOString();
 const session = {
   meta: {
-    title: "Sophista × blablabuild — Process Workshop",
+    title: "Sophista × blablabuild",
     company: "Sophista",
-    goal: "Van binnenkomende informatie → verwerking & analyse → eerste gestandaardiseerde rapport (voorbereidingsfase verkoopproces)",
+    goal: "Proces begrijpen → oplossingsrichtingen → eerste tech-contouren (fase 1: info → analyse → eerste rapport)",
     createdAt: now,
     updatedAt: now,
     passwordProtected: true,
     passwordHash: hashPassword("sophista-dinsdag"),
+    intro: {
+      todayGoal:
+        "Het voorbereidingsproces van Sophista voldoende begrijpen om tot concrete AI-oplossingsrichtingen te komen — en voor de gekozen richting een eerste technische contour te schetsen.",
+      discover: [
+        "Hoe loopt het proces nu van inkomende informatie naar bruikbare output?",
+        "Waar zit de meeste tijd, frictie of kwaliteitsverlies?",
+        "Wat is een realistische eerste gestandaardiseerde output (fase 1)?",
+        "Welke AI-richting(en) verdienen prioriteit — en waarom?",
+        "Welke bouwblokken zijn nodig voor die eerste richting?",
+      ],
+      agenda: [
+        "Intro & check-in (wie is er, doel vandaag)",
+        "Doel & scope bevestigen",
+        "Huidig proces: inkomend → verwerking (op het bord)",
+        "Eerste output: wat moet eruit komen?",
+        "Richtingen prioriteren (o.a. Sophista-inventarisatie)",
+        "Tech-contour voor #1",
+        "Later / next steps afspreken",
+      ],
+      nextSteps: [
+        "Gekozen richting + contour samenvatten",
+        "Open vragen & benodigde input van Sophista",
+        "Vervolgafspraak / bouwvoorstel",
+      ],
+      attendees: [],
+    },
   },
   cards,
   sketch: null,
@@ -332,15 +195,10 @@ async function redis(...args) {
   return data.result;
 }
 
-const existing = await redis("GET", KEY);
-if (existing) {
-  console.log("Existing session found — overwriting with prepared Sophista board.");
-}
-
 await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
-console.log("Seeded:", SESSION_ID);
+console.log("Reset Sophista facilitation board");
 console.log("Cards:", cards.length);
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
 console.log("Password: sophista-dinsdag");
