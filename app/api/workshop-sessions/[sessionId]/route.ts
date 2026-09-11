@@ -10,8 +10,21 @@ import {
   type WorkshopSession,
 } from "@/lib/workshop-types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const TTL = 60 * 60 * 24 * 90; // 90 days
 const KEY = (id: string) => `workshop:${normalizeSessionId(id)}`;
+
+function noStore(data: unknown, init?: { status?: number }) {
+  return NextResponse.json(data, {
+    status: init?.status,
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      Pragma: "no-cache",
+    },
+  });
+}
 
 async function getRaw(sessionId: string): Promise<WorkshopSession | null> {
   const key = KEY(sessionId);
@@ -65,7 +78,7 @@ export async function GET(
   { params }: { params: { sessionId: string } }
 ) {
   if (!KV_READY) {
-    return NextResponse.json({
+    return noStore({
       meta: createEmptyMeta(),
       cards: [],
       sketch: null,
@@ -79,7 +92,7 @@ export async function GET(
     const session = (await getRaw(params.sessionId)) ?? emptySession();
     const unlocked = isUnlocked(req, params.sessionId, session.meta);
     if (session.meta.passwordProtected && !unlocked) {
-      return NextResponse.json({
+      return noStore({
         meta: publicMeta(session.meta),
         cards: [],
         sketch: null,
@@ -89,9 +102,9 @@ export async function GET(
       });
     }
     await redisCommand("EXPIRE", KEY(params.sessionId), String(TTL));
-    return NextResponse.json(clientPayload(session, unlocked));
+    return noStore(clientPayload(session, unlocked));
   } catch {
-    return NextResponse.json({
+    return noStore({
       meta: createEmptyMeta(),
       cards: [],
       sketch: null,
@@ -143,7 +156,7 @@ export async function PUT(
   { params }: { params: { sessionId: string } }
 ) {
   if (!KV_READY) {
-    return NextResponse.json({ ok: false, kv: false });
+    return noStore({ ok: false, kv: false });
   }
 
   const body = (await req.json()) as Body;
@@ -153,13 +166,13 @@ export async function PUT(
 
     if (body.action === "unlock") {
       if (!session.meta.passwordProtected || !session.meta.passwordHash) {
-        return NextResponse.json({ ok: true, unlocked: true, kv: true });
+        return noStore({ ok: true, unlocked: true, kv: true });
       }
       if (!verifyPassword(body.password, session.meta.passwordHash)) {
-        return NextResponse.json({ ok: false, error: "Invalid password" }, { status: 401 });
+        return noStore({ ok: false, error: "Invalid password" }, { status: 401 });
       }
       const token = unlockToken(normalizeSessionId(params.sessionId), session.meta.passwordHash);
-      const res = NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      const res = noStore({ ok: true, ...clientPayload(session, true) });
       res.cookies.set(`ws_unlock_${normalizeSessionId(params.sessionId)}`, token, {
         httpOnly: true,
         sameSite: "lax",
@@ -172,14 +185,14 @@ export async function PUT(
 
     const unlocked = isUnlocked(req, params.sessionId, session.meta);
     if (session.meta.passwordProtected && !unlocked && body.action !== "bootstrap") {
-      return NextResponse.json({ ok: false, error: "Locked" }, { status: 401 });
+      return noStore({ ok: false, error: "Locked" }, { status: 401 });
     }
 
     if (body.action === "bootstrap") {
       const existing = await getRaw(params.sessionId);
       if (existing && (existing.cards.length > 0 || existing.sketch || existing.meta.company)) {
         const u = isUnlocked(req, params.sessionId, existing.meta);
-        return NextResponse.json({ ok: true, ...clientPayload(existing, u) });
+        return noStore({ ok: true, ...clientPayload(existing, u) });
       }
       const password = body.password?.trim();
       session = emptySession({
@@ -188,7 +201,7 @@ export async function PUT(
         passwordHash: password ? hashPassword(password) : undefined,
       });
       await saveSession(params.sessionId, session);
-      const res = NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      const res = noStore({ ok: true, ...clientPayload(session, true) });
       if (password && session.meta.passwordHash) {
         res.cookies.set(
           `ws_unlock_${normalizeSessionId(params.sessionId)}`,
@@ -223,7 +236,7 @@ export async function PUT(
         session.meta.passwordHash = hashPassword(nextPassword.trim());
       }
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "update-intro") {
@@ -232,7 +245,7 @@ export async function PUT(
         intro: body.intro,
       };
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "upsert-card") {
@@ -240,30 +253,30 @@ export async function PUT(
       if (idx >= 0) session.cards[idx] = body.card;
       else session.cards.push(body.card);
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "delete-card") {
       session.cards = session.cards.filter((c) => c.id !== body.id);
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "replace-cards") {
       session.cards = body.cards;
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "save-sketch") {
       session.sketch = body.sketch;
       await saveSession(params.sessionId, session);
-      return NextResponse.json({ ok: true, ...clientPayload(session, true) });
+      return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
-    return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
+    return noStore({ ok: false, error: "Unknown action" }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed";
-    return NextResponse.json({ ok: false, error: message, kv: false }, { status: 500 });
+    return noStore({ ok: false, error: message, kv: false }, { status: 500 });
   }
 }

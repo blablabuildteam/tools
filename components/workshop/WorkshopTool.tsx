@@ -194,12 +194,11 @@ export default function WorkshopTool() {
       if (skipPoll.current) return;
       try {
         const data = await loadSession(sessionId);
-        if (!data.requiresPassword) {
-          // Never clobber an in-progress sketch from a poll
-          applyPayload(data, {
-            keepLocalSketch: tabRef.current === "sketch" || sketchDirty.current,
-          });
-        }
+        // Never apply a locked/empty poll — that wipes a successful unlock
+        if (data.requiresPassword) return;
+        applyPayload(data, {
+          keepLocalSketch: tabRef.current === "sketch" || sketchDirty.current,
+        });
       } catch {
         /* ignore */
       }
