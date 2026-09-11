@@ -1,38 +1,38 @@
 export const WORKSHOP_COLUMNS = [
   {
     id: "goal",
-    title: "1. Doel",
-    hint: "Waarom zitten we hier? Scope bevestigen.",
+    title: "Doel",
+    hint: "Optioneel — scope-notities",
   },
   {
     id: "incoming",
-    title: "2. Inkomend",
-    hint: "Wat komt er binnen bij een deal?",
+    title: "Inkomend",
+    hint: "Correcties op bronnen",
   },
   {
     id: "process",
-    title: "3. Proces nu",
-    hint: "Wat gebeurt er daarna handmatig?",
+    title: "Proces-notities",
+    hint: "Wat anders loopt dan de schets",
   },
   {
     id: "report",
-    title: "4. Eerste output",
-    hint: "Wat moet het eerste standaard-rapport zijn?",
+    title: "Eerste output",
+    hint: "Wat het rapport moet zijn",
   },
   {
     id: "solutions",
-    title: "5. Richtingen",
-    hint: "Welke AI-opties? Stem & prioriteer.",
+    title: "Richtingen",
+    hint: "AI-opties om te prioriteren",
   },
   {
     id: "tech",
-    title: "6. Tech",
-    hint: "Eerste bouwblokken voor de gekozen richting.",
+    title: "Tech",
+    hint: "Bouwblokken voor #1",
   },
   {
     id: "later",
-    title: "7. Later",
-    hint: "Vervolg in het verkoopproces — niet vandaag.",
+    title: "Later",
+    hint: "Uitbreidingen meenemen",
   },
 ] as const;
 
@@ -111,7 +111,7 @@ export function createEmptyMeta(partial?: Partial<WorkshopMeta>): WorkshopMeta {
     company: partial?.company ?? "",
     goal:
       partial?.goal ??
-      "Van binnenkomende informatie → verwerking & analyse → eerste gestandaardiseerde rapport",
+      "Informatie-verzameling versnellen → gestandaardiseerd rapport",
     createdAt: partial?.createdAt ?? now,
     updatedAt: partial?.updatedAt ?? now,
     passwordProtected: Boolean(partial?.passwordProtected),

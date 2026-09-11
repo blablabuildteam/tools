@@ -1,11 +1,12 @@
 /**
- * Seed / reset Sophista workshop as a FACILITATION board (not a doc dump).
+ * Reset Sophista workshop: facilitation intro + process flowchart in Schets.
  * Run: node scripts/seed-sophista-workshop.mjs
  */
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { randomBytes, createHash } from "crypto";
+import { createTLStore, createShapeId, toRichText, loadSnapshot, getIndices } from "tldraw";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = resolve(__dirname, "../.env.local");
@@ -47,138 +48,298 @@ function card(partial, order) {
   };
 }
 
-/**
- * Sparse prompt cards — the group fills the board live.
- * Sophista AI-use cases only as short options to prioritize in column 5.
- */
+let indices = [];
+let indexPos = 0;
+function nextIndex() {
+  if (!indices.length) indices = getIndices(40);
+  return indices[indexPos++];
+}
+
+function box(id, x, y, w, h, text, color = "light-blue") {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "geo",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      geo: "rectangle",
+      url: "",
+      w,
+      h,
+      growY: 0,
+      scale: 1,
+      flipX: false,
+      flipY: false,
+      labelColor: "black",
+      color,
+      fill: "semi",
+      dash: "solid",
+      size: "s",
+      font: "sans",
+      align: "middle",
+      verticalAlign: "middle",
+      richText: toRichText(text),
+    },
+    meta: {},
+  };
+}
+
+function arrowGeo(id, x, y) {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "geo",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      geo: "arrow-right",
+      url: "",
+      w: 48,
+      h: 36,
+      growY: 0,
+      scale: 1,
+      flipX: false,
+      flipY: false,
+      labelColor: "black",
+      color: "grey",
+      fill: "solid",
+      dash: "solid",
+      size: "s",
+      font: "sans",
+      align: "middle",
+      verticalAlign: "middle",
+      richText: toRichText(""),
+    },
+    meta: {},
+  };
+}
+
+function label(id, x, y, w, h, text, color = "black") {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "text",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      color,
+      size: "l",
+      w,
+      font: "sans",
+      textAlign: "start",
+      autoSize: false,
+      scale: 1,
+      richText: toRichText(text),
+    },
+    meta: {},
+  };
+}
+
+function buildFlowchartSnapshot() {
+  const store = createTLStore();
+  // Ensure page exists via empty load, then put shapes
+  const empty = store.getStoreSnapshot();
+  loadSnapshot(store, { document: { store: empty.store, schema: empty.schema } });
+
+  const shapes = [
+    label("title", 40, 30, 900, 40, "Sophista — aanname proces (ter validatie)", "black"),
+    label(
+      "subtitle",
+      40,
+      80,
+      980,
+      40,
+      "Scope workshop: informatie verzamelen → analyse → eerste gestandaardiseerde rapport",
+      "blue"
+    ),
+
+    // Main phase 1 flow
+    box("b1", 40, 200, 200, 110, "1. Intake / trigger\nNieuwe deal of\nverkooptraject start", "yellow"),
+    arrowGeo("a1", 260, 237),
+    box(
+      "b2",
+      330,
+      200,
+      220,
+      110,
+      "2. Informatie verzamelen\nKlant + intern + extern\n(nu: handmatig / traag)",
+      "light-blue"
+    ),
+    arrowGeo("a2", 570, 237),
+    box(
+      "b3",
+      640,
+      200,
+      220,
+      110,
+      "3. Verwerken & analyseren\nStructureren, checken,\naanvullen, interpreteren",
+      "violet"
+    ),
+    arrowGeo("a3", 880, 237),
+    box(
+      "b4",
+      950,
+      200,
+      230,
+      110,
+      "4. Eerste standaard-\nrapport / output\n(fase-1 doel)",
+      "light-green"
+    ),
+
+    // Inputs under step 2
+    label("in-label", 330, 350, 280, 30, "Wat komt er typisch binnen?", "grey"),
+    box("in1", 330, 390, 160, 70, "Klantinput\ndossier / gesprekken", "grey"),
+    box("in2", 505, 390, 160, 70, "Intern\nIMs, templates,\nkennisbank", "grey"),
+    box("in3", 680, 390, 180, 70, "Extern\nCompany.info /\nGain.pro / publiek", "grey"),
+
+    // Pain / opportunity
+    box(
+      "pain",
+      40,
+      390,
+      250,
+      100,
+      "Hypothese pijn\nTijd & inconsistentie\nin verzamelen + schrijven\n→ te valideren",
+      "orange"
+    ),
+
+    // Later phases
+    label("later-label", 40, 540, 700, 30, "Later in het verkoopproces (kort meenemen, niet bouwen vandaag)", "grey"),
+    box("l1", 40, 590, 180, 70, "Marketing\nteaser / shortlist / NDA", "grey"),
+    arrowGeo("la1", 240, 607),
+    box("l2", 310, 590, 180, 70, "Due diligence\nVDR / Q&A", "grey"),
+    arrowGeo("la2", 510, 607),
+    box("l3", 580, 590, 200, 70, "Signing & closing\nSPA / notaris", "grey"),
+
+    box(
+      "note",
+      950,
+      390,
+      230,
+      120,
+      "Workshop-vraag\nKlopt deze flow?\nWat mist / anders?\nWaar AI eerst helpen?",
+      "yellow"
+    ),
+  ];
+
+  store.put(shapes);
+  const raw = store.getStoreSnapshot();
+  // Format compatible with client loadSnapshot / getSnapshot.document
+  return {
+    document: {
+      store: raw.store,
+      schema: raw.schema,
+    },
+  };
+}
+
+// Board: only capture notes during workshop — flowchart is the main artifact
 const cards = [
   card(
     {
-      id: "g1",
-      columnId: "goal",
-      title: "Startpunt samenwerking",
-      body: "Onderzoeken hoe AI/automatisering het bedrijfsverkoopproces van Sophista kan ondersteunen — beginnend bij de voorbereidingsfase.",
-      color: "#CEFF00",
-    },
-    0
-  ),
-  card(
-    {
-      id: "g2",
-      columnId: "goal",
-      title: "Scope vandaag",
-      body: "Alleen: inkomende info → verwerking/analyse → eerste gestandaardiseerde rapport.\n\nVraag aan de groep: klopt deze afbakening?",
-      color: "#CEFF00",
-    },
-    1
-  ),
-
-  card(
-    {
-      id: "i1",
-      columnId: "incoming",
-      title: "Vragen om samen te beantwoorden",
-      body: "• Welke documenten/bronnen komen binnen bij een nieuwe deal?\n• Wat komt van de klant vs. wat zoeken jullie zelf?\n• Wat mist er vaak?",
-      color: "#7DD3FC",
-    },
-    0
-  ),
-
-  card(
-    {
-      id: "p1",
+      id: "cap1",
       columnId: "process",
-      title: "Vragen om samen te beantwoorden",
-      body: "• Wie doet wat, in welke volgorde?\n• Welke stappen kosten de meeste tijd?\n• Waar gaan kwaliteit of consistentie mis?",
+      title: "Validatie-notities",
+      body: "Gebruik dit bord voor correcties op de flowchart: wat anders loopt, wie doet wat, waar zit de echte pijn.",
       color: "#A78BFA",
     },
     0
   ),
-
   card(
     {
-      id: "r1",
-      columnId: "report",
-      title: "Vragen om samen te beantwoorden",
-      body: "• Wat is de eerste bruikbare ‘standaard output’ (niet meteen een volledig IM)?\n• Voor wie is die output?\n• Wanneer is die ‘goed genoeg’?",
-      color: "#86EFAC",
-    },
-    0
-  ),
-
-  card(
-    {
-      id: "s1",
+      id: "cap2",
       columnId: "solutions",
-      title: "Opties uit Sophista-inventarisatie",
-      body: "Kort stemmen / rangschikken (niet uitwerken):\n1 Bedrijfsverkenning\n2 Marktanalyse\n3 IM-generator\n4 NDA personaliseren\n5 Teaser uit IM\n6 Longlist / buyer dashboard\n\nVoeg eigen kaarten toe voor nieuwe ideeën.",
+      title: "Oplossingsideeën",
+      body: "Na validatie: hier landen de AI-richtingen die we willen prioriteren (bijv. info-verzameling → standaardrapport).",
       color: "#FCD34D",
     },
     0
   ),
-
   card(
     {
-      id: "t1",
+      id: "cap3",
       columnId: "tech",
-      title: "Na prioritering invullen",
-      body: "Voor de #1 richting: welke bouwblokken zijn nodig (bronnen, templates, review-stap, output-format)?",
+      title: "Tech-contour #1",
+      body: "Voor de gekozen richting: bronnen, templates, review-stap, output-formaat.",
       color: "#CEFF00",
     },
     0
   ),
-
   card(
     {
-      id: "l1",
+      id: "cap4",
       columnId: "later",
-      title: "Even parkeren",
-      body: "Marketingfase, DD, signing — kort noemen zodat fase 1 niet losstaat, niet uitwerken vandaag.",
+      title: "Toekomstige agents",
+      body: "Wat we meenemen zodat de eerste oplossing uitbreidbaar blijft (marketing / DD / …).",
       color: "#FDBA74",
     },
     0
   ),
 ];
 
+const sketch = buildFlowchartSnapshot();
+// sanity: ensure reload works
+{
+  const test = createTLStore();
+  loadSnapshot(test, sketch);
+  const n = [...test.allRecords()].filter((r) => r.typeName === "shape").length;
+  console.log("Flowchart shapes:", n);
+  writeFileSync(resolve(__dirname, "../exports/sophista-flowchart-snapshot.json"), JSON.stringify(sketch));
+}
+
 const now = new Date().toISOString();
 const session = {
   meta: {
     title: "Sophista × blablabuild",
     company: "Sophista",
-    goal: "Proces begrijpen → oplossingsrichtingen → eerste tech-contouren (fase 1: info → analyse → eerste rapport)",
+    goal: "Informatie-verzameling versnellen → gestandaardiseerd rapport (begin bedrijfsverkoopproces)",
     createdAt: now,
     updatedAt: now,
     passwordProtected: true,
     passwordHash: hashPassword("sophista-dinsdag"),
     intro: {
       todayGoal:
-        "Het voorbereidingsproces van Sophista voldoende begrijpen om tot concrete AI-oplossingsrichtingen te komen — en voor de gekozen richting een eerste technische contour te schetsen.",
+        "Het begin van Sophista’s bedrijfsverkoopproces scherp krijgen — specifiek: informatie verzamelen automatiseren/versnellen om daarna een gestandaardiseerd rapport uit te draaien — en daaruit tot oplossingsrichtingen + eerste tech-contouren komen.",
       discover: [
-        "Hoe loopt het proces nu van inkomende informatie naar bruikbare output?",
-        "Waar zit de meeste tijd, frictie of kwaliteitsverlies?",
-        "Wat is een realistische eerste gestandaardiseerde output (fase 1)?",
-        "Welke AI-richting(en) verdienen prioriteit — en waarom?",
-        "Welke bouwblokken zijn nodig voor die eerste richting?",
+        "Hoe loopt ‘informatie verzamelen → rapport’ nu precies (stappen, rollen, systemen)?",
+        "Waar zit de meeste tijd / frictie / kwaliteitsverlies?",
+        "Wat is een realistische eerste gestandaardiseerde output?",
+        "Welke AI-richting eerst — zodat we snel in oplossingsmodus kunnen?",
+        "Waar moeten we technisch rekening mee houden voor latere uitbreidingen in het verkoopproces?",
       ],
       agenda: [
-        "Intro & check-in (wie is er, doel vandaag)",
-        "Doel & scope bevestigen",
-        "Huidig proces: inkomend → verwerking (op het bord)",
-        "Eerste output: wat moet eruit komen?",
-        "Richtingen prioriteren (o.a. Sophista-inventarisatie)",
-        "Tech-contour voor #1",
-        "Later / next steps afspreken",
+        "Intro & check-in",
+        "Schets: aanname-proces valideren / bijtekenen (hoofdactiviteit)",
+        "Pijn & eerste output scherp zetten",
+        "Oplossingsrichtingen prioriteren",
+        "Eerste tech-contour + next steps",
       ],
       nextSteps: [
-        "Gekozen richting + contour samenvatten",
-        "Open vragen & benodigde input van Sophista",
-        "Vervolgafspraak / bouwvoorstel",
+        "Gekozen richting + gevalideerd proces samenvatten",
+        "Open vragen / benodigde input van Sophista",
+        "Vervolg: bouwvoorstel / volgende sessie",
       ],
       attendees: [],
     },
   },
   cards,
-  sketch: null,
+  sketch,
 };
 
 async function redis(...args) {
@@ -198,7 +359,7 @@ async function redis(...args) {
 await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
-console.log("Reset Sophista facilitation board");
-console.log("Cards:", cards.length);
+console.log("Seeded facilitation session + flowchart sketch");
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
 console.log("Password: sophista-dinsdag");
+console.log("Open tab Schets for the process flowchart");
