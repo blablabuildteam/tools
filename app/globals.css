@@ -38,7 +38,7 @@ body {
   }
 }
 
-/* tldraw needs a sized container */
+/* tldraw canvas */
 .tldraw-wrap {
   position: absolute;
   inset: 0;
@@ -49,33 +49,33 @@ body {
 }
 
 .workshop-sketch-canvas {
-  background: #f4f5f2;
+  background: #f7f6f2;
 }
 
 .workshop-sketch-canvas .tl-background {
-  background-color: #f4f5f2 !important;
+  background-color: #f7f6f2 !important;
 }
 
-/* Quieter chrome: softer panels, less visual noise */
-.workshop-sketch-canvas .tlui-toolbar,
+.workshop-sketch-canvas .tlui-layout {
+  --tl-color-panel: rgba(255, 255, 255, 0.92);
+}
+
+.workshop-sketch-canvas .tlui-toolbar__inner,
 .workshop-sketch-canvas .tlui-style-panel,
-.workshop-sketch-canvas .tlui-layout__top {
-  filter: none;
+.workshop-sketch-canvas .tlui-menu-zone {
+  border-radius: 16px !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 10px 30px rgba(15, 20, 25, 0.1) !important;
+  border: 1px solid rgba(21, 31, 40, 0.08) !important;
+  backdrop-filter: blur(10px);
 }
 
 .workshop-sketch-canvas .tlui-button,
 .workshop-sketch-canvas .tlui-button__tool {
-  border-radius: 10px !important;
+  border-radius: 11px !important;
 }
 
-.workshop-sketch-canvas .tlui-toolbar__inner {
-  border-radius: 14px !important;
-  box-shadow: 0 8px 28px rgba(21, 31, 40, 0.12) !important;
-  border: 1px solid rgba(21, 31, 40, 0.08) !important;
-}
-
-.workshop-sketch-canvas .tlui-style-panel {
-  border-radius: 14px !important;
-  box-shadow: 0 8px 28px rgba(21, 31, 40, 0.1) !important;
-  border: 1px solid rgba(21, 31, 40, 0.08) !important;
+.workshop-sketch-canvas .tlui-toolbar {
+  margin-bottom: 12px !important;
 }

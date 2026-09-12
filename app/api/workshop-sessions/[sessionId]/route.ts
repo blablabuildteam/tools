@@ -8,6 +8,7 @@ import {
   type WorkshopIntro,
   type WorkshopMeta,
   type WorkshopSession,
+  type WorkshopSummary,
 } from "@/lib/workshop-types";
 
 export const dynamic = "force-dynamic";
@@ -149,6 +150,10 @@ type Body =
   | {
       action: "save-sketch";
       sketch: unknown;
+    }
+  | {
+      action: "update-summary";
+      summary: WorkshopSummary;
     };
 
 export async function PUT(
@@ -270,6 +275,15 @@ export async function PUT(
 
     if (body.action === "save-sketch") {
       session.sketch = body.sketch;
+      await saveSession(params.sessionId, session);
+      return noStore({ ok: true, ...clientPayload(session, true) });
+    }
+
+    if (body.action === "update-summary") {
+      session.meta = {
+        ...session.meta,
+        summary: body.summary,
+      };
       await saveSession(params.sessionId, session);
       return noStore({ ok: true, ...clientPayload(session, true) });
     }

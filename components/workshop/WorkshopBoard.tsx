@@ -110,7 +110,7 @@ export default function WorkshopBoard({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-7rem)] gap-3 overflow-x-auto p-4 sm:p-6">
+    <div className="flex min-h-[calc(100vh-9rem)] gap-4 overflow-x-auto p-4 sm:p-6">
       {columns.map((col) => {
         const list = byColumn.get(col.id) ?? [];
         const isOverCol = dropTarget?.columnId === col.id;
@@ -120,7 +120,6 @@ export default function WorkshopBoard({
             key={col.id}
             onDragOver={(e) => {
               e.preventDefault();
-              // drop at end when hovering empty / column chrome
               if ((e.target as HTMLElement).closest("[data-card]")) return;
               onColumnDragOver(e, col.id, list.length);
             }}
@@ -132,11 +131,9 @@ export default function WorkshopBoard({
               dragIdRef.current = null;
               setDropTarget(null);
             }}
-            onDragLeave={() => {
-              // keep indicator while inside children
-            }}
-            className={`flex w-[300px] shrink-0 flex-col rounded-2xl border bg-white/[0.03] transition ${
-              isOverCol ? "border-bla-lime/50 bg-bla-lime/[0.04]" : "border-white/10"
+            onDragLeave={() => {}}
+            className={`flex w-[min(100%,340px)] shrink-0 flex-col rounded-2xl border bg-white/[0.03] transition sm:w-[360px] ${
+              isOverCol ? "border-[#ceff00]/50 bg-[#ceff00]/[0.04]" : "border-white/10"
             }`}
           >
             <div className="border-b border-white/10 px-3 py-3">
