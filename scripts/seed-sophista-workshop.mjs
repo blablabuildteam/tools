@@ -1,11 +1,10 @@
 /**
- * Seed Sophista workshop with tldraw process flowchart for freehand Schets.
+ * Reset Sophista schets to Excalidraw format (client seeds default flowchart if empty).
  * Run: node scripts/seed-sophista-workshop.mjs
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
-import { createTLStore, createShapeId, toRichText, loadSnapshot, getIndices, getSnapshot } from "tldraw";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = resolve(__dirname, "../.env.local");
@@ -24,9 +23,9 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
 const SESSION_ID = "sophista-workshop";
 const KEY = `workshop:${SESSION_ID}`;
 const TTL = 60 * 60 * 24 * 90;
+const now = new Date().toISOString();
 
 function card(partial, order) {
-  const now = new Date().toISOString();
   return {
     id: partial.id,
     columnId: partial.columnId,
@@ -40,265 +39,6 @@ function card(partial, order) {
     updatedAt: now,
   };
 }
-
-let indices = [];
-let indexPos = 0;
-function nextIndex() {
-  if (!indices.length) indices = getIndices(40);
-  return indices[indexPos++];
-}
-
-function box(id, x, y, w, h, text, color = "light-blue") {
-  return {
-    id: createShapeId(id),
-    typeName: "shape",
-    type: "geo",
-    x,
-    y,
-    rotation: 0,
-    index: nextIndex(),
-    parentId: "page:page",
-    isLocked: false,
-    opacity: 1,
-    props: {
-      geo: "rectangle",
-      url: "",
-      w,
-      h,
-      growY: 0,
-      scale: 1,
-      flipX: false,
-      flipY: false,
-      labelColor: "black",
-      color,
-      fill: "semi",
-      dash: "solid",
-      size: "s",
-      font: "sans",
-      align: "middle",
-      verticalAlign: "middle",
-      richText: toRichText(text),
-    },
-    meta: {},
-  };
-}
-
-function arrowGeo(id, x, y) {
-  return {
-    id: createShapeId(id),
-    typeName: "shape",
-    type: "geo",
-    x,
-    y,
-    rotation: 0,
-    index: nextIndex(),
-    parentId: "page:page",
-    isLocked: false,
-    opacity: 1,
-    props: {
-      geo: "arrow-right",
-      url: "",
-      w: 48,
-      h: 36,
-      growY: 0,
-      scale: 1,
-      flipX: false,
-      flipY: false,
-      labelColor: "black",
-      color: "grey",
-      fill: "solid",
-      dash: "solid",
-      size: "s",
-      font: "sans",
-      align: "middle",
-      verticalAlign: "middle",
-      richText: toRichText(""),
-    },
-    meta: {},
-  };
-}
-
-function label(id, x, y, w, text, color = "black") {
-  return {
-    id: createShapeId(id),
-    typeName: "shape",
-    type: "text",
-    x,
-    y,
-    rotation: 0,
-    index: nextIndex(),
-    parentId: "page:page",
-    isLocked: false,
-    opacity: 1,
-    props: {
-      color,
-      size: "l",
-      w,
-      font: "sans",
-      textAlign: "start",
-      autoSize: false,
-      scale: 1,
-      richText: toRichText(text),
-    },
-    meta: {},
-  };
-}
-
-function buildFlowchartSnapshot() {
-  const store = createTLStore();
-  const empty = store.getStoreSnapshot();
-  loadSnapshot(store, { document: { store: empty.store, schema: empty.schema } });
-
-  store.put([
-    label("title", 40, 30, 900, "Sophista — aanname proces (ter validatie)", "black"),
-    label(
-      "subtitle",
-      40,
-      80,
-      980,
-      "Scope workshop: informatie verzamelen → analyse → eerste gestandaardiseerde rapport",
-      "blue"
-    ),
-    box("b1", 40, 200, 200, 110, "1. Intake / trigger\nNieuwe deal of\nverkooptraject start", "yellow"),
-    arrowGeo("a1", 260, 237),
-    box(
-      "b2",
-      330,
-      200,
-      220,
-      110,
-      "2. Informatie verzamelen\nKlant + intern + extern\n(nu: handmatig / traag)",
-      "light-blue"
-    ),
-    arrowGeo("a2", 570, 237),
-    box(
-      "b3",
-      640,
-      200,
-      220,
-      110,
-      "3. Verwerken & analyseren\nStructureren, checken,\naanvullen, interpreteren",
-      "violet"
-    ),
-    arrowGeo("a3", 880, 237),
-    box(
-      "b4",
-      950,
-      200,
-      230,
-      110,
-      "4. Eerste standaard-\nrapport / output\n(fase-1 doel)",
-      "light-green"
-    ),
-    label("in-label", 330, 350, 280, "Wat komt er typisch binnen?", "grey"),
-    box("in1", 330, 390, 160, 70, "Klantinput\ndossier / gesprekken", "grey"),
-    box("in2", 505, 390, 160, 70, "Intern\nIMs, templates,\nkennisbank", "grey"),
-    box("in3", 680, 390, 180, 70, "Extern\nCompany.info /\nGain.pro / publiek", "grey"),
-    box(
-      "pain",
-      40,
-      390,
-      250,
-      100,
-      "Hypothese pijn\nTijd & inconsistentie\nin verzamelen + schrijven\n→ te valideren",
-      "orange"
-    ),
-    label("later-label", 40, 540, 700, "Later in het verkoopproces (kort meenemen, niet bouwen vandaag)", "grey"),
-    box("l1", 40, 590, 180, 70, "Marketing\nteaser / shortlist / NDA", "grey"),
-    arrowGeo("la1", 240, 607),
-    box("l2", 310, 590, 180, 70, "Due diligence\nVDR / Q&A", "grey"),
-    arrowGeo("la2", 510, 607),
-    box("l3", 580, 590, 200, 70, "Signing & closing\nSPA / notaris", "grey"),
-    box(
-      "note",
-      950,
-      390,
-      230,
-      120,
-      "Workshop-vraag\nKlopt deze flow?\nWat mist / anders?\nWaar AI eerst helpen?",
-      "yellow"
-    ),
-  ]);
-
-  const full = getSnapshot(store);
-  return { document: full.document };
-}
-
-const now = new Date().toISOString();
-const sketch = buildFlowchartSnapshot();
-const shapeCount = Object.keys(sketch.document.store).filter((k) => k.startsWith("shape:")).length;
-console.log("Flowchart shapes:", shapeCount);
-
-const cards = [
-  card(
-    {
-      id: "n1",
-      columnId: "notes",
-      title: "Wat anders loopt",
-      body: "Correcties op de flowchart: stappen, rollen, systemen, echte pijn.",
-      color: "#A78BFA",
-    },
-    0
-  ),
-  card(
-    {
-      id: "d1",
-      columnId: "directions",
-      title: "Prioriteit #1",
-      body: "Na validatie: welke richting eerst? (zie tab Richtingen)",
-      color: "#FCD34D",
-    },
-    0
-  ),
-  card(
-    {
-      id: "t1",
-      columnId: "tech",
-      title: "Tech-contour",
-      body: "Bronnen · templates · review-stap · output-formaat · uitbreidbaarheid",
-      color: "#CEFF00",
-    },
-    0
-  ),
-];
-
-const intro = {
-  todayGoal:
-    "Het begin van Sophista’s bedrijfsverkoopproces scherp krijgen — specifiek: informatie verzamelen automatiseren/versnellen om daarna een gestandaardiseerd rapport uit te draaien — en daaruit tot oplossingsrichtingen + een eerste tech-contour komen.",
-  discover: [
-    "Hoe loopt ‘informatie verzamelen → rapport’ nu precies (stappen, rollen, systemen)?",
-    "Waar zit de meeste tijd / frictie / kwaliteitsverlies?",
-    "Wat is een realistische eerste gestandaardiseerde output?",
-    "Welke AI-richting eerst — zodat we snel in oplossingsmodus kunnen?",
-    "Waar moeten we technisch rekening mee houden voor latere uitbreidingen in het verkoopproces?",
-  ],
-  agenda: [
-    "15:00–15:15 · Intro & check-in (doel, scope, succes vandaag)",
-    "15:15–16:15 · Schets: aanname-proces valideren / bijtekenen (hoofdactiviteit)",
-    "16:15–16:30 · Korte pauze",
-    "16:30–17:15 · Pijn & eerste output scherp zetten → richtingen prioriteren",
-    "17:15–17:45 · Tech-contour voor #1",
-    "17:45–18:00 · Afronding: samenvatting + next steps",
-  ],
-  nextSteps: [
-    "Succes vandaag: gevalideerd proces + prioriteit #1 + eerste tech-contour",
-    "Open vragen / benodigde input van Sophista vastleggen",
-    "Vervolg (later): concreet bouw-/vervolgvoorstel (onderdeel B)",
-  ],
-  attendees: [
-    { id: "a1", name: "Kevin Roos van Raadshooven", org: "BlaBlaBuild", joinedAt: now },
-    { id: "a2", name: "Xennith Oosterveer", org: "BlaBlaBuild", joinedAt: now },
-    { id: "a3", name: "André Scheirlinck", org: "Sophista", joinedAt: now },
-    { id: "a4", name: "Dave Nijhuis", org: "Sophista", joinedAt: now },
-    {
-      id: "a5",
-      name: "IT manager",
-      org: "Sophista",
-      role: "IT (naam nog invullen)",
-      joinedAt: now,
-    },
-  ],
-};
 
 async function redis(...args) {
   const res = await fetch(process.env.KV_REST_API_URL, {
@@ -324,6 +64,12 @@ if (typeof existingRaw === "string") {
   }
 }
 
+// Keep existing Excalidraw edits; otherwise empty scene → client builds default flowchart
+const keepExcalidraw =
+  existing?.sketch?.type === "excalidraw" &&
+  Array.isArray(existing.sketch.elements) &&
+  existing.sketch.elements.length > 0;
+
 const session = {
   meta: {
     title: "Sophista × blablabuild",
@@ -332,7 +78,43 @@ const session = {
     createdAt: existing?.meta?.createdAt || now,
     updatedAt: now,
     passwordProtected: false,
-    intro,
+    intro: existing?.meta?.intro || {
+      todayGoal:
+        "Het begin van Sophista’s bedrijfsverkoopproces scherp krijgen — informatie verzamelen versnellen → gestandaardiseerd rapport — plus oplossingsrichtingen + tech-contour.",
+      discover: [
+        "Hoe loopt ‘informatie verzamelen → rapport’ nu precies?",
+        "Waar zit de meeste tijd / frictie / kwaliteitsverlies?",
+        "Wat is een realistische eerste gestandaardiseerde output?",
+        "Welke AI-richting eerst?",
+        "Waar moeten we technisch rekening mee houden voor latere uitbreidingen?",
+      ],
+      agenda: [
+        "15:00–15:15 · Intro & check-in",
+        "15:15–16:15 · Schets: proces valideren / bijtekenen",
+        "16:15–16:30 · Pauze",
+        "16:30–17:15 · Pijn & richtingen prioriteren",
+        "17:15–17:45 · Tech-contour #1",
+        "17:45–18:00 · Afronding",
+      ],
+      nextSteps: [
+        "Succes vandaag: gevalideerd proces + prioriteit #1 + tech-contour",
+        "Open vragen vastleggen",
+        "Vervolg: bouwvoorstel (B) later",
+      ],
+      attendees: [
+        { id: "a1", name: "Kevin Roos van Raadshooven", org: "BlaBlaBuild", joinedAt: now },
+        { id: "a2", name: "Xennith Oosterveer", org: "BlaBlaBuild", joinedAt: now },
+        { id: "a3", name: "André Scheirlinck", org: "Sophista", joinedAt: now },
+        { id: "a4", name: "Dave Nijhuis", org: "Sophista", joinedAt: now },
+        {
+          id: "a5",
+          name: "IT manager",
+          org: "Sophista",
+          role: "IT (naam nog invullen)",
+          joinedAt: now,
+        },
+      ],
+    },
     summary: existing?.meta?.summary || {
       validatedProcess: "",
       priorityOne: "",
@@ -341,14 +123,57 @@ const session = {
       nextStepsOut: "",
     },
   },
-  cards,
-  // Always restore drawable flowchart (process-flow HTML is not drawable)
-  sketch,
+  cards: existing?.cards?.length
+    ? existing.cards
+    : [
+        card(
+          {
+            id: "n1",
+            columnId: "notes",
+            title: "Wat anders loopt",
+            body: "Correcties op de flowchart.",
+            color: "#A78BFA",
+          },
+          0
+        ),
+        card(
+          {
+            id: "d1",
+            columnId: "directions",
+            title: "Prioriteit #1",
+            body: "Welke richting eerst?",
+            color: "#FCD34D",
+          },
+          0
+        ),
+        card(
+          {
+            id: "t1",
+            columnId: "tech",
+            title: "Tech-contour",
+            body: "Bronnen · templates · review · output",
+            color: "#CEFF00",
+          },
+          0
+        ),
+      ],
+  sketch: keepExcalidraw
+    ? existing.sketch
+    : {
+        type: "excalidraw",
+        version: 2,
+        elements: [],
+        appState: { viewBackgroundColor: "#f7f6f2" },
+        files: {},
+      },
 };
 
 await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
-console.log("Seeded drawable tldraw flowchart");
+console.log(
+  keepExcalidraw
+    ? "Kept existing Excalidraw scene"
+    : "Reset schets → client will seed default flowchart"
+);
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
-process.exit(0);

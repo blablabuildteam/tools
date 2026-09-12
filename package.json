@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.0",
     "@vercel/kv": "^0.2.4",
     "framer-motion": "^11.18.2",
     "lucide-react": "^1.45.0",

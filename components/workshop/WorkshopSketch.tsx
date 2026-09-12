@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 
 type Props = {
   sessionId: string;
@@ -8,20 +8,13 @@ type Props = {
 };
 
 /**
- * Schets tab = iframe to isolated draw page.
- * Parent React state updates cannot remount tldraw inside the iframe.
+ * Schets tab embeds an isolated draw frame (Excalidraw).
+ * Kept in an iframe so workshop React updates cannot destroy the canvas.
  */
 export default function WorkshopSketch({ sessionId, active }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    if (!active) return;
-    // Tell the frame to recalc viewport after becoming visible
-    const t = window.setTimeout(() => {
-      iframeRef.current?.contentWindow?.postMessage({ type: "workshop-sketch-visible" }, "*");
-    }, 100);
-    return () => window.clearTimeout(t);
-  }, [active]);
+  void active;
+  void iframeRef;
 
   return (
     <div className="absolute inset-0 bg-[#f7f6f2]">

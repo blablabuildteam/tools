@@ -1,67 +1,192 @@
 "use client";
 
 /**
- * Isolated tldraw host — runs in its own iframe so parent React re-renders
- * can never remount/destroy the canvas (that caused the blanking bug).
+ * Excalidraw draw host — no tldraw license gate (that blanked the canvas after 5s).
+ * Runs in an iframe so the workshop shell cannot remount it.
  */
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  createTLStore,
-  getSnapshot,
-  loadSnapshot,
-  type Editor,
-  type TLStore,
-  type TLStoreSnapshot,
-  type TLUiComponents,
-} from "tldraw";
-import "tldraw/tldraw.css";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "@excalidraw/excalidraw/index.css";
 
-const Tldraw = dynamic(async () => (await import("tldraw")).Tldraw, {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center text-sm text-[#151f28]/50">
-      Canvas starten…
-    </div>
-  ),
-});
+const Excalidraw = dynamic(
+  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center text-sm text-[#151f28]/50">
+        Tekenvlak laden…
+      </div>
+    ),
+  }
+);
 
-const UI: TLUiComponents = {
-  SharePanel: null,
-  CursorChatBubble: null,
-  PeopleMenu: null,
-  DebugPanel: null,
-  DebugMenu: null,
+type ExcalidrawScene = {
+  type: "excalidraw";
+  version: 2;
+  elements: readonly unknown[];
+  appState?: Record<string, unknown>;
+  files?: Record<string, unknown>;
 };
 
-function normalize(raw: unknown): TLStoreSnapshot | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  // Ignore HTML process-flow payloads — frame expects tldraw
-  if ((obj as { type?: string }).type === "process-flow") return null;
-  if (obj.document && typeof obj.document === "object") {
-    return { document: obj.document } as unknown as TLStoreSnapshot;
-  }
-  if (obj.store && obj.schema) {
-    return { document: obj } as unknown as TLStoreSnapshot;
-  }
-  return null;
+function isExcalidrawScene(raw: unknown): raw is ExcalidrawScene {
+  return Boolean(
+    raw &&
+      typeof raw === "object" &&
+      (raw as ExcalidrawScene).type === "excalidraw" &&
+      Array.isArray((raw as ExcalidrawScene).elements)
+  );
+}
+
+/** Default Sophista process assumption as Excalidraw skeleton elements */
+async function buildDefaultElements() {
+  const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
+  return convertToExcalidrawElements(
+    [
+      {
+        type: "text",
+        x: 40,
+        y: 24,
+        text: "Sophista — aanname proces (ter validatie)\nTeken vrij bij / corrigeer / vul aan",
+        fontSize: 28,
+      },
+      {
+        type: "rectangle",
+        x: 40,
+        y: 120,
+        width: 200,
+        height: 110,
+        backgroundColor: "#ffe066",
+        label: { text: "1. Intake / trigger\nNieuwe deal of\nverkooptraject start" },
+      },
+      { type: "arrow", x: 250, y: 165, width: 60, height: 0 },
+      {
+        type: "rectangle",
+        x: 320,
+        y: 120,
+        width: 220,
+        height: 110,
+        backgroundColor: "#a5d8ff",
+        label: { text: "2. Informatie verzamelen\nKlant + intern + extern\n(nu: handmatig / traag)" },
+      },
+      { type: "arrow", x: 550, y: 165, width: 60, height: 0 },
+      {
+        type: "rectangle",
+        x: 620,
+        y: 120,
+        width: 220,
+        height: 110,
+        backgroundColor: "#d0bfff",
+        label: { text: "3. Verwerken & analyseren\nStructureren, checken,\naanvullen, interpreteren" },
+      },
+      { type: "arrow", x: 850, y: 165, width: 60, height: 0 },
+      {
+        type: "rectangle",
+        x: 920,
+        y: 120,
+        width: 230,
+        height: 110,
+        backgroundColor: "#b2f2bb",
+        label: { text: "4. Eerste standaardrapport\nGestandaardiseerde output\n(fase-1 doel)" },
+      },
+      {
+        type: "rectangle",
+        x: 40,
+        y: 280,
+        width: 240,
+        height: 100,
+        backgroundColor: "#ffc078",
+        label: { text: "Hypothese pijn\nTijd & inconsistentie in\nverzamelen + schrijven" },
+      },
+      {
+        type: "rectangle",
+        x: 320,
+        y: 280,
+        width: 160,
+        height: 80,
+        backgroundColor: "#e9ecef",
+        label: { text: "Klantinput\ndossier / gesprekken" },
+      },
+      {
+        type: "rectangle",
+        x: 500,
+        y: 280,
+        width: 160,
+        height: 80,
+        backgroundColor: "#e9ecef",
+        label: { text: "Intern\nIMs / templates" },
+      },
+      {
+        type: "rectangle",
+        x: 680,
+        y: 280,
+        width: 180,
+        height: 80,
+        backgroundColor: "#e9ecef",
+        label: { text: "Extern\nCompany.info / Gain.pro" },
+      },
+      {
+        type: "rectangle",
+        x: 920,
+        y: 280,
+        width: 230,
+        height: 100,
+        backgroundColor: "#fff3bf",
+        label: { text: "Workshop-vraag\nKlopt deze flow?\nWat mist? Waar AI eerst?" },
+      },
+      {
+        type: "text",
+        x: 40,
+        y: 420,
+        text: "Later (niet bouwen vandaag)",
+        fontSize: 18,
+      },
+      {
+        type: "rectangle",
+        x: 40,
+        y: 460,
+        width: 180,
+        height: 70,
+        backgroundColor: "#dee2e6",
+        label: { text: "Marketing\nteaser / NDA" },
+      },
+      { type: "arrow", x: 230, y: 490, width: 50, height: 0 },
+      {
+        type: "rectangle",
+        x: 290,
+        y: 460,
+        width: 180,
+        height: 70,
+        backgroundColor: "#dee2e6",
+        label: { text: "Due diligence\nVDR / Q&A" },
+      },
+      { type: "arrow", x: 480, y: 490, width: 50, height: 0 },
+      {
+        type: "rectangle",
+        x: 540,
+        y: 460,
+        width: 200,
+        height: 70,
+        backgroundColor: "#dee2e6",
+        label: { text: "Signing & closing\nSPA / notaris" },
+      },
+    ],
+    { regenerateIds: true }
+  );
 }
 
 export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
-  const [store] = useState<TLStore>(() => createTLStore());
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
+  const [initialData, setInitialData] = useState<{
+    elements: readonly unknown[];
+    appState: Record<string, unknown>;
+    scrollToContent: boolean;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const loaded = useRef(false);
-  const editorRef = useRef<Editor | null>(null);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const allowSave = useRef(false);
-  const baseline = useRef(0);
   const statusRef = useRef<HTMLSpanElement>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const baseline = useRef(0);
+  const ready = useRef(false);
 
-  // Load once from API into the stable store
   useEffect(() => {
-    if (!sessionId || loaded.current) return;
     let cancelled = false;
 
     (async () => {
@@ -74,125 +199,103 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
 
         if (data.requiresPassword) {
           setError("Sessie is vergrendeld — ontgrendel eerst in de workshop.");
-          setPhase("error");
           return;
         }
 
-        const snap = normalize(data.sketch);
-        if (snap) {
-          loadSnapshot(store, snap);
+        let elements: readonly unknown[];
+        if (isExcalidrawScene(data.sketch) && data.sketch.elements.length > 0) {
+          elements = data.sketch.elements;
+        } else {
+          elements = await buildDefaultElements();
         }
-        loaded.current = true;
-        baseline.current = [...store.allRecords()].filter((r) => r.typeName === "shape").length;
-        setPhase("ready");
+
+        baseline.current = elements.filter((el) => !(el as { isDeleted?: boolean }).isDeleted).length;
+        setInitialData({
+          elements,
+          appState: {
+            viewBackgroundColor: "#f7f6f2",
+            currentItemFontFamily: 1,
+            ...(isExcalidrawScene(data.sketch) ? data.sketch.appState || {} : {}),
+          },
+          scrollToContent: true,
+        });
+        ready.current = true;
+        if (statusRef.current) {
+          statusRef.current.textContent = `${baseline.current} elementen · teken vrij`;
+        }
       } catch (e) {
         console.error(e);
-        if (!cancelled) {
-          setError("Schets laden mislukt");
-          setPhase("error");
-        }
+        if (!cancelled) setError("Schets laden mislukt");
       }
     })();
 
     return () => {
       cancelled = true;
-    };
-  }, [sessionId, store]);
-
-  // Persist user edits — never write an empty wipe over existing shapes
-  useEffect(() => {
-    if (phase !== "ready") return;
-
-    const unsub = store.listen(
-      () => {
-        if (!allowSave.current) return;
-        if (saveTimer.current) clearTimeout(saveTimer.current);
-        if (statusRef.current) statusRef.current.textContent = "Opslaan…";
-
-        saveTimer.current = setTimeout(() => {
-          const shapes = [...store.allRecords()].filter((r) => r.typeName === "shape").length;
-          if (shapes === 0 && baseline.current > 0) {
-            if (statusRef.current) statusRef.current.textContent = "Lege save geblokkeerd";
-            return;
-          }
-          try {
-            const full = getSnapshot(store);
-            void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                action: "save-sketch",
-                sketch: { document: full.document },
-              }),
-            }).then((r) => {
-              if (r.ok) {
-                baseline.current = shapes;
-                if (statusRef.current) statusRef.current.textContent = "Opgeslagen";
-              } else if (statusRef.current) {
-                statusRef.current.textContent = "Save mislukt";
-              }
-            });
-          } catch {
-            if (statusRef.current) statusRef.current.textContent = "Save mislukt";
-          }
-        }, 900);
-      },
-      { source: "user", scope: "document" }
-    );
-
-    // Enable saves after first paint settles (no camera hacks)
-    const t = window.setTimeout(() => {
-      allowSave.current = true;
-      if (statusRef.current) {
-        statusRef.current.textContent =
-          baseline.current > 0 ? `${baseline.current} vormen · teken vrij` : "Teken vrij";
-      }
-    }, 800);
-
-    return () => {
-      unsub();
-      window.clearTimeout(t);
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [phase, store, sessionId]);
+  }, [sessionId]);
 
-  const fit = useCallback(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-    try {
-      const el = editor.getContainer();
-      const rect = el.getBoundingClientRect();
-      if (rect.width < 100 || rect.height < 100) return;
-      editor.updateViewportScreenBounds(el);
-      if (editor.getCurrentPageShapes().length > 0) {
-        editor.zoomToFit({ animation: { duration: 200 } });
+  const onChange = useCallback(
+    (elements: readonly unknown[]) => {
+      if (!ready.current) return;
+      const live = elements.filter((el) => !(el as { isDeleted?: boolean }).isDeleted);
+      if (live.length === 0 && baseline.current > 0) {
+        if (statusRef.current) statusRef.current.textContent = "Lege save geblokkeerd";
+        return;
       }
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
-  // Parent asks us to recalc bounds when Schets tab becomes visible again
-  useEffect(() => {
-    function onMessage(e: MessageEvent) {
-      if (e.data?.type === "workshop-sketch-visible") {
-        requestAnimationFrame(() => fit());
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [fit]);
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (statusRef.current) statusRef.current.textContent = "Opslaan…";
 
-  const onMount = useCallback((editor: Editor) => {
-    editorRef.current = editor;
-    try {
-      editor.user.updateUserPreferences({ colorScheme: "light" });
-    } catch {
-      /* ignore */
-    }
-  }, []);
+      saveTimer.current = setTimeout(() => {
+        const scene: ExcalidrawScene = {
+          type: "excalidraw",
+          version: 2,
+          elements: elements as unknown[],
+          appState: { viewBackgroundColor: "#f7f6f2" },
+          files: {},
+        };
+        void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "save-sketch", sketch: scene }),
+        }).then((r) => {
+          if (r.ok) {
+            baseline.current = live.length;
+            if (statusRef.current) statusRef.current.textContent = "Opgeslagen";
+          } else if (statusRef.current) {
+            statusRef.current.textContent = "Save mislukt";
+          }
+        });
+      }, 900);
+    },
+    [sessionId]
+  );
 
-  if (phase === "loading") {
+  const uiOptions = useMemo(
+    () => ({
+      canvasActions: {
+        changeViewBackgroundColor: true,
+        clearCanvas: false,
+        export: false,
+        loadScene: false,
+        saveToActiveFile: false,
+        toggleTheme: false,
+        saveAsImage: true,
+      },
+    }),
+    []
+  );
+
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#f7f6f2] px-6 text-center text-sm text-[#151f28]">
+        {error}
+      </div>
+    );
+  }
+
+  if (!initialData) {
     return (
       <div className="flex h-full items-center justify-center bg-[#f7f6f2] text-sm text-[#151f28]/50">
         Tekenvlak laden…
@@ -200,21 +303,18 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
     );
   }
 
-  if (phase === "error") {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 bg-[#f7f6f2] px-6 text-center">
-        <p className="text-sm font-medium text-[#151f28]">{error}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="relative h-full w-full bg-[#f7f6f2]">
       <div className="absolute inset-0">
-        <Tldraw store={store} components={UI} onMount={onMount} autoFocus />
+        <Excalidraw
+          initialData={initialData as never}
+          onChange={onChange as never}
+          UIOptions={uiOptions as never}
+          theme="light"
+          langCode="nl-NL"
+        />
       </div>
-
-      <div className="pointer-events-none absolute bottom-3 left-3 z-50 flex gap-2">
+      <div className="pointer-events-none absolute bottom-3 left-3 z-50">
         <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#151f28]/92 px-3 py-1.5 text-[11px] text-white shadow-lg ring-1 ring-white/10">
           <span className="font-medium">Schets</span>
           <span className="h-3 w-px bg-white/20" />
@@ -222,13 +322,6 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
             …
           </span>
         </div>
-        <button
-          type="button"
-          onClick={fit}
-          className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
-        >
-          Alles tonen
-        </button>
       </div>
     </div>
   );

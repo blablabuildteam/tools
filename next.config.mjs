@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["tldraw"],
+  transpilePackages: ["tldraw", "@excalidraw/excalidraw"],
   eslint: {
     // Migrated AI Matrix has pre-existing lint noise; keep shipping.
     ignoreDuringBuilds: true,
