@@ -612,7 +612,7 @@ export default function WorkshopTool() {
             // Keep layout size while hidden so tldraw viewport stays valid
             aria-hidden={tab !== "sketch"}
           >
-            <WorkshopSketch snapshot={frozenSketch} onSave={saveSketch} />
+            <WorkshopSketch initial={frozenSketch} onSave={saveSketch} />
           </div>
         )}
       </div>
