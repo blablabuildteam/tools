@@ -68,7 +68,6 @@ export default function WorkshopTool() {
   const [cards, setCards] = useState<WorkshopCard[]>([]);
   const [sketch, setSketch] = useState<unknown | null>(null);
   const [sketchOpened, setSketchOpened] = useState(false);
-  const [frozenSketch, setFrozenSketch] = useState<unknown | null>(null);
   const [kv, setKv] = useState(true);
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -83,10 +82,8 @@ export default function WorkshopTool() {
   }, [tab]);
 
   function openSketch() {
-    if (!sketchOpened) {
-      setFrozenSketch(sketch);
-      setSketchOpened(true);
-    }
+    sketchDirty.current = true;
+    setSketchOpened(true);
     setTab("sketch");
   }
 
@@ -301,24 +298,6 @@ export default function WorkshopTool() {
       }
     },
     [cards, sessionId]
-  );
-
-  const saveSketch = useCallback(
-    (nextSketch: unknown) => {
-      sketchDirty.current = true;
-      if (!sessionId) return;
-      skipPoll.current = true;
-      void fetch(`/api/workshop-sessions/${sessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save-sketch", sketch: nextSketch }),
-      }).finally(() => {
-        setTimeout(() => {
-          skipPoll.current = false;
-        }, 2000);
-      });
-    },
-    [sessionId]
   );
 
   const saveSummary = useCallback(
@@ -609,10 +588,9 @@ export default function WorkshopTool() {
                 ? "absolute inset-0 z-10"
                 : "pointer-events-none invisible absolute inset-0 z-0"
             }
-            // Keep layout size while hidden so tldraw viewport stays valid
             aria-hidden={tab !== "sketch"}
           >
-            <WorkshopSketch initial={frozenSketch} onSave={saveSketch} />
+            <WorkshopSketch sessionId={sessionId} active={tab === "sketch"} />
           </div>
         )}
       </div>

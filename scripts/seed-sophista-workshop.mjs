@@ -1,10 +1,11 @@
 /**
- * Seed Sophista workshop with stable HTML process-flow (no tldraw).
+ * Seed Sophista workshop with tldraw process flowchart for freehand Schets.
  * Run: node scripts/seed-sophista-workshop.mjs
  */
 import { readFileSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createTLStore, createShapeId, toRichText, loadSnapshot, getIndices, getSnapshot } from "tldraw";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = resolve(__dirname, "../.env.local");
@@ -40,76 +41,193 @@ function card(partial, order) {
   };
 }
 
-const now = new Date().toISOString();
+let indices = [];
+let indexPos = 0;
+function nextIndex() {
+  if (!indices.length) indices = getIndices(40);
+  return indices[indexPos++];
+}
 
-const sketch = {
-  type: "process-flow",
-  version: 1,
-  title: "Sophista — aanname proces (ter validatie)",
-  subtitle: "Scope: informatie verzamelen → analyse → eerste gestandaardiseerde rapport",
-  nodes: [
-    {
-      id: "b1",
-      lane: "main",
-      title: "1. Intake / trigger",
-      body: "Nieuwe deal of verkooptraject start",
-      tone: "yellow",
+function box(id, x, y, w, h, text, color = "light-blue") {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "geo",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      geo: "rectangle",
+      url: "",
+      w,
+      h,
+      growY: 0,
+      scale: 1,
+      flipX: false,
+      flipY: false,
+      labelColor: "black",
+      color,
+      fill: "semi",
+      dash: "solid",
+      size: "s",
+      font: "sans",
+      align: "middle",
+      verticalAlign: "middle",
+      richText: toRichText(text),
     },
-    {
-      id: "b2",
-      lane: "main",
-      title: "2. Informatie verzamelen",
-      body: "Klant + intern + extern\n(nu: handmatig / traag)",
-      tone: "blue",
+    meta: {},
+  };
+}
+
+function arrowGeo(id, x, y) {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "geo",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      geo: "arrow-right",
+      url: "",
+      w: 48,
+      h: 36,
+      growY: 0,
+      scale: 1,
+      flipX: false,
+      flipY: false,
+      labelColor: "black",
+      color: "grey",
+      fill: "solid",
+      dash: "solid",
+      size: "s",
+      font: "sans",
+      align: "middle",
+      verticalAlign: "middle",
+      richText: toRichText(""),
     },
-    {
-      id: "b3",
-      lane: "main",
-      title: "3. Verwerken & analyseren",
-      body: "Structureren, checken, aanvullen, interpreteren",
-      tone: "violet",
+    meta: {},
+  };
+}
+
+function label(id, x, y, w, text, color = "black") {
+  return {
+    id: createShapeId(id),
+    typeName: "shape",
+    type: "text",
+    x,
+    y,
+    rotation: 0,
+    index: nextIndex(),
+    parentId: "page:page",
+    isLocked: false,
+    opacity: 1,
+    props: {
+      color,
+      size: "l",
+      w,
+      font: "sans",
+      textAlign: "start",
+      autoSize: false,
+      scale: 1,
+      richText: toRichText(text),
     },
-    {
-      id: "b4",
-      lane: "main",
-      title: "4. Eerste standaardrapport",
-      body: "Gestandaardiseerde output (fase-1 doel)",
-      tone: "green",
-    },
-    { id: "in1", lane: "inputs", title: "Klantinput", body: "Dossier / gesprekken", tone: "grey" },
-    {
-      id: "in2",
-      lane: "inputs",
-      title: "Intern",
-      body: "IMs, templates, kennisbank",
-      tone: "grey",
-    },
-    {
-      id: "in3",
-      lane: "inputs",
-      title: "Extern",
-      body: "Company.info / Gain.pro / publiek",
-      tone: "grey",
-    },
-    {
-      id: "pain",
-      lane: "side",
-      title: "Hypothese pijn",
-      body: "Tijd & inconsistentie in verzamelen + schrijven → te valideren",
-      tone: "orange",
-    },
-    {
-      id: "ask",
-      lane: "side",
-      title: "Workshop-vraag",
-      body: "Klopt deze flow?\nWat mist / anders?\nWaar AI eerst helpen?",
-      tone: "yellow",
-    },
-    { id: "l1", lane: "later", title: "Marketing", body: "Teaser / shortlist / NDA", tone: "grey" },
-    { id: "l2", lane: "later", title: "Due diligence", body: "VDR / Q&A", tone: "grey" },
-    { id: "l3", lane: "later", title: "Signing & closing", body: "SPA / notaris", tone: "grey" },
-  ],
-};
+    meta: {},
+  };
+}
+
+function buildFlowchartSnapshot() {
+  const store = createTLStore();
+  const empty = store.getStoreSnapshot();
+  loadSnapshot(store, { document: { store: empty.store, schema: empty.schema } });
+
+  store.put([
+    label("title", 40, 30, 900, "Sophista — aanname proces (ter validatie)", "black"),
+    label(
+      "subtitle",
+      40,
+      80,
+      980,
+      "Scope workshop: informatie verzamelen → analyse → eerste gestandaardiseerde rapport",
+      "blue"
+    ),
+    box("b1", 40, 200, 200, 110, "1. Intake / trigger\nNieuwe deal of\nverkooptraject start", "yellow"),
+    arrowGeo("a1", 260, 237),
+    box(
+      "b2",
+      330,
+      200,
+      220,
+      110,
+      "2. Informatie verzamelen\nKlant + intern + extern\n(nu: handmatig / traag)",
+      "light-blue"
+    ),
+    arrowGeo("a2", 570, 237),
+    box(
+      "b3",
+      640,
+      200,
+      220,
+      110,
+      "3. Verwerken & analyseren\nStructureren, checken,\naanvullen, interpreteren",
+      "violet"
+    ),
+    arrowGeo("a3", 880, 237),
+    box(
+      "b4",
+      950,
+      200,
+      230,
+      110,
+      "4. Eerste standaard-\nrapport / output\n(fase-1 doel)",
+      "light-green"
+    ),
+    label("in-label", 330, 350, 280, "Wat komt er typisch binnen?", "grey"),
+    box("in1", 330, 390, 160, 70, "Klantinput\ndossier / gesprekken", "grey"),
+    box("in2", 505, 390, 160, 70, "Intern\nIMs, templates,\nkennisbank", "grey"),
+    box("in3", 680, 390, 180, 70, "Extern\nCompany.info /\nGain.pro / publiek", "grey"),
+    box(
+      "pain",
+      40,
+      390,
+      250,
+      100,
+      "Hypothese pijn\nTijd & inconsistentie\nin verzamelen + schrijven\n→ te valideren",
+      "orange"
+    ),
+    label("later-label", 40, 540, 700, "Later in het verkoopproces (kort meenemen, niet bouwen vandaag)", "grey"),
+    box("l1", 40, 590, 180, 70, "Marketing\nteaser / shortlist / NDA", "grey"),
+    arrowGeo("la1", 240, 607),
+    box("l2", 310, 590, 180, 70, "Due diligence\nVDR / Q&A", "grey"),
+    arrowGeo("la2", 510, 607),
+    box("l3", 580, 590, 200, 70, "Signing & closing\nSPA / notaris", "grey"),
+    box(
+      "note",
+      950,
+      390,
+      230,
+      120,
+      "Workshop-vraag\nKlopt deze flow?\nWat mist / anders?\nWaar AI eerst helpen?",
+      "yellow"
+    ),
+  ]);
+
+  const full = getSnapshot(store);
+  return { document: full.document };
+}
+
+const now = new Date().toISOString();
+const sketch = buildFlowchartSnapshot();
+const shapeCount = Object.keys(sketch.document.store).filter((k) => k.startsWith("shape:")).length;
+console.log("Flowchart shapes:", shapeCount);
 
 const cards = [
   card(
@@ -127,7 +245,7 @@ const cards = [
       id: "d1",
       columnId: "directions",
       title: "Prioriteit #1",
-      body: "Na validatie: welke richting eerst? (zie tab Richtingen voor UC’s)",
+      body: "Na validatie: welke richting eerst? (zie tab Richtingen)",
       color: "#FCD34D",
     },
     0
@@ -159,7 +277,7 @@ const intro = {
     "15:15–16:15 · Schets: aanname-proces valideren / bijtekenen (hoofdactiviteit)",
     "16:15–16:30 · Korte pauze",
     "16:30–17:15 · Pijn & eerste output scherp zetten → richtingen prioriteren",
-    "17:15–17:45 · Tech-contour voor #1 (bouwblokken, constraints, uitbreidbaarheid)",
+    "17:15–17:45 · Tech-contour voor #1",
     "17:45–18:00 · Afronding: samenvatting + next steps",
   ],
   nextSteps: [
@@ -206,16 +324,11 @@ if (typeof existingRaw === "string") {
   }
 }
 
-const keepFlow =
-  existing?.sketch?.type === "process-flow" &&
-  Array.isArray(existing.sketch.nodes) &&
-  existing.sketch.nodes.length > 0;
-
 const session = {
   meta: {
     title: "Sophista × blablabuild",
     company: "Sophista",
-    goal: "Informatie-verzameling versnellen → gestandaardiseerd rapport (begin bedrijfsverkoopproces)",
+    goal: "Informatie-verzameling versnellen → gestandaardiseerd rapport",
     createdAt: existing?.meta?.createdAt || now,
     updatedAt: now,
     passwordProtected: false,
@@ -229,11 +342,13 @@ const session = {
     },
   },
   cards,
-  sketch: keepFlow ? existing.sketch : sketch,
+  // Always restore drawable flowchart (process-flow HTML is not drawable)
+  sketch,
 };
 
 await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
-console.log("Seeded process-flow schets:", keepFlow ? "kept edits" : "fresh default");
+console.log("Seeded drawable tldraw flowchart");
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
+process.exit(0);

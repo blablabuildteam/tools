@@ -38,4 +38,7 @@ body {
   }
 }
 
-/* reserved for workshop sketch helpers */
+.tl-container {
+  width: 100% !important;
+  height: 100% !important;
+}
