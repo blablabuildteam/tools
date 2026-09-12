@@ -604,7 +604,13 @@ export default function WorkshopTool() {
 
         {sketchOpened && (
           <div
-            className={`absolute inset-0 ${tab === "sketch" ? "z-10" : "pointer-events-none invisible z-0"}`}
+            className={
+              tab === "sketch"
+                ? "absolute inset-0 z-10"
+                : "pointer-events-none invisible absolute inset-0 z-0"
+            }
+            // Keep layout size while hidden so tldraw viewport stays valid
+            aria-hidden={tab !== "sketch"}
           >
             <WorkshopSketch snapshot={frozenSketch} onSave={saveSketch} />
           </div>

@@ -38,14 +38,19 @@ body {
   }
 }
 
-/* tldraw canvas */
+/* tldraw canvas — must always fill parent */
 .tldraw-wrap {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
 }
 
 .tldraw-wrap .tl-container {
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
 }
 
 .workshop-sketch-canvas {
@@ -54,28 +59,4 @@ body {
 
 .workshop-sketch-canvas .tl-background {
   background-color: #f7f6f2 !important;
-}
-
-.workshop-sketch-canvas .tlui-layout {
-  --tl-color-panel: rgba(255, 255, 255, 0.92);
-}
-
-.workshop-sketch-canvas .tlui-toolbar__inner,
-.workshop-sketch-canvas .tlui-style-panel,
-.workshop-sketch-canvas .tlui-menu-zone {
-  border-radius: 16px !important;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.7) inset,
-    0 10px 30px rgba(15, 20, 25, 0.1) !important;
-  border: 1px solid rgba(21, 31, 40, 0.08) !important;
-  backdrop-filter: blur(10px);
-}
-
-.workshop-sketch-canvas .tlui-button,
-.workshop-sketch-canvas .tlui-button__tool {
-  border-radius: 11px !important;
-}
-
-.workshop-sketch-canvas .tlui-toolbar {
-  margin-bottom: 12px !important;
 }
