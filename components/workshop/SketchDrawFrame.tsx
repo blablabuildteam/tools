@@ -1,11 +1,16 @@
 "use client";
 
 /**
- * Excalidraw draw host — no tldraw license gate (that blanked the canvas after 5s).
- * Runs in an iframe so the workshop shell cannot remount it.
+ * Workshop draw host (iframe):
+ * - Proces = React Flow (connected flowchart — best for arrows)
+ * - Vrij = Excalidraw (freehand when needed)
  */
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ProcessFlowEditor, {
+  createDefaultSophistaFlow,
+  type FlowSketch,
+} from "@/components/workshop/ProcessFlowEditor";
 import "@excalidraw/excalidraw/index.css";
 
 const Excalidraw = dynamic(
@@ -14,7 +19,7 @@ const Excalidraw = dynamic(
     ssr: false,
     loading: () => (
       <div className="flex h-full items-center justify-center text-sm text-[#151f28]/50">
-        Tekenvlak laden…
+        Vrij tekenen laden…
       </div>
     ),
   }
@@ -28,167 +33,44 @@ type ExcalidrawScene = {
   files?: Record<string, unknown>;
 };
 
-function isExcalidrawScene(raw: unknown): raw is ExcalidrawScene {
+type WorkshopSketchDoc = {
+  type: "workshop-sketch-v2";
+  flow: FlowSketch;
+  freehand: ExcalidrawScene | null;
+};
+
+type Mode = "flow" | "free";
+
+function isFlowSketch(raw: unknown): raw is FlowSketch {
   return Boolean(
     raw &&
       typeof raw === "object" &&
-      (raw as ExcalidrawScene).type === "excalidraw" &&
-      Array.isArray((raw as ExcalidrawScene).elements)
+      Array.isArray((raw as FlowSketch).nodes) &&
+      Array.isArray((raw as FlowSketch).edges)
   );
 }
 
-/** Default Sophista process assumption as Excalidraw skeleton elements */
-async function buildDefaultElements() {
-  const { convertToExcalidrawElements } = await import("@excalidraw/excalidraw");
-  return convertToExcalidrawElements(
-    [
-      {
-        type: "text",
-        x: 40,
-        y: 24,
-        text: "Sophista — aanname proces (ter validatie)\nTeken vrij bij / corrigeer / vul aan",
-        fontSize: 28,
-      },
-      {
-        type: "rectangle",
-        x: 40,
-        y: 120,
-        width: 200,
-        height: 110,
-        backgroundColor: "#ffe066",
-        label: { text: "1. Intake / trigger\nNieuwe deal of\nverkooptraject start" },
-      },
-      { type: "arrow", x: 250, y: 165, width: 60, height: 0 },
-      {
-        type: "rectangle",
-        x: 320,
-        y: 120,
-        width: 220,
-        height: 110,
-        backgroundColor: "#a5d8ff",
-        label: { text: "2. Informatie verzamelen\nKlant + intern + extern\n(nu: handmatig / traag)" },
-      },
-      { type: "arrow", x: 550, y: 165, width: 60, height: 0 },
-      {
-        type: "rectangle",
-        x: 620,
-        y: 120,
-        width: 220,
-        height: 110,
-        backgroundColor: "#d0bfff",
-        label: { text: "3. Verwerken & analyseren\nStructureren, checken,\naanvullen, interpreteren" },
-      },
-      { type: "arrow", x: 850, y: 165, width: 60, height: 0 },
-      {
-        type: "rectangle",
-        x: 920,
-        y: 120,
-        width: 230,
-        height: 110,
-        backgroundColor: "#b2f2bb",
-        label: { text: "4. Eerste standaardrapport\nGestandaardiseerde output\n(fase-1 doel)" },
-      },
-      {
-        type: "rectangle",
-        x: 40,
-        y: 280,
-        width: 240,
-        height: 100,
-        backgroundColor: "#ffc078",
-        label: { text: "Hypothese pijn\nTijd & inconsistentie in\nverzamelen + schrijven" },
-      },
-      {
-        type: "rectangle",
-        x: 320,
-        y: 280,
-        width: 160,
-        height: 80,
-        backgroundColor: "#e9ecef",
-        label: { text: "Klantinput\ndossier / gesprekken" },
-      },
-      {
-        type: "rectangle",
-        x: 500,
-        y: 280,
-        width: 160,
-        height: 80,
-        backgroundColor: "#e9ecef",
-        label: { text: "Intern\nIMs / templates" },
-      },
-      {
-        type: "rectangle",
-        x: 680,
-        y: 280,
-        width: 180,
-        height: 80,
-        backgroundColor: "#e9ecef",
-        label: { text: "Extern\nCompany.info / Gain.pro" },
-      },
-      {
-        type: "rectangle",
-        x: 920,
-        y: 280,
-        width: 230,
-        height: 100,
-        backgroundColor: "#fff3bf",
-        label: { text: "Workshop-vraag\nKlopt deze flow?\nWat mist? Waar AI eerst?" },
-      },
-      {
-        type: "text",
-        x: 40,
-        y: 420,
-        text: "Later (niet bouwen vandaag)",
-        fontSize: 18,
-      },
-      {
-        type: "rectangle",
-        x: 40,
-        y: 460,
-        width: 180,
-        height: 70,
-        backgroundColor: "#dee2e6",
-        label: { text: "Marketing\nteaser / NDA" },
-      },
-      { type: "arrow", x: 230, y: 490, width: 50, height: 0 },
-      {
-        type: "rectangle",
-        x: 290,
-        y: 460,
-        width: 180,
-        height: 70,
-        backgroundColor: "#dee2e6",
-        label: { text: "Due diligence\nVDR / Q&A" },
-      },
-      { type: "arrow", x: 480, y: 490, width: 50, height: 0 },
-      {
-        type: "rectangle",
-        x: 540,
-        y: 460,
-        width: 200,
-        height: 70,
-        backgroundColor: "#dee2e6",
-        label: { text: "Signing & closing\nSPA / notaris" },
-      },
-    ],
-    { regenerateIds: true }
+function isV2(raw: unknown): raw is WorkshopSketchDoc {
+  return Boolean(raw && typeof raw === "object" && (raw as WorkshopSketchDoc).type === "workshop-sketch-v2");
+}
+
+function isExcalidraw(raw: unknown): raw is ExcalidrawScene {
+  return Boolean(
+    raw && typeof raw === "object" && (raw as ExcalidrawScene).type === "excalidraw"
   );
 }
 
 export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
-  const [initialData, setInitialData] = useState<{
-    elements: readonly unknown[];
-    appState: Record<string, unknown>;
-    scrollToContent: boolean;
-  } | null>(null);
+  const [mode, setMode] = useState<Mode>("flow");
+  const [flow, setFlow] = useState<FlowSketch | null>(null);
+  const [freehand, setFreehand] = useState<ExcalidrawScene | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const statusRef = useRef<HTMLSpanElement>(null);
+  const freeStatus = useRef<HTMLSpanElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const baseline = useRef(0);
-  const ready = useRef(false);
+  const docRef = useRef<WorkshopSketchDoc | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-
     (async () => {
       try {
         const res = await fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
@@ -196,132 +78,197 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
         });
         const data = await res.json();
         if (cancelled) return;
-
         if (data.requiresPassword) {
           setError("Sessie is vergrendeld — ontgrendel eerst in de workshop.");
           return;
         }
 
-        let elements: readonly unknown[];
-        if (isExcalidrawScene(data.sketch) && data.sketch.elements.length > 0) {
-          elements = data.sketch.elements;
+        const sketch = data.sketch;
+        let next: WorkshopSketchDoc;
+
+        if (isV2(sketch)) {
+          next = {
+            type: "workshop-sketch-v2",
+            flow: isFlowSketch(sketch.flow) ? sketch.flow : createDefaultSophistaFlow(),
+            freehand: isExcalidraw(sketch.freehand) ? sketch.freehand : null,
+          };
+        } else if (isExcalidraw(sketch) && sketch.elements.length > 0) {
+          // Migrate previous Excalidraw-only saves
+          next = {
+            type: "workshop-sketch-v2",
+            flow: createDefaultSophistaFlow(),
+            freehand: sketch,
+          };
         } else {
-          elements = await buildDefaultElements();
+          next = {
+            type: "workshop-sketch-v2",
+            flow: createDefaultSophistaFlow(),
+            freehand: null,
+          };
         }
 
-        baseline.current = elements.filter((el) => !(el as { isDeleted?: boolean }).isDeleted).length;
-        setInitialData({
-          elements,
-          appState: {
-            viewBackgroundColor: "#f7f6f2",
-            currentItemFontFamily: 1,
-            ...(isExcalidrawScene(data.sketch) ? data.sketch.appState || {} : {}),
-          },
-          scrollToContent: true,
-        });
-        ready.current = true;
-        if (statusRef.current) {
-          statusRef.current.textContent = `${baseline.current} elementen · teken vrij`;
-        }
+        docRef.current = next;
+        setFlow(next.flow);
+        setFreehand(next.freehand);
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Schets laden mislukt");
       }
     })();
-
     return () => {
       cancelled = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [sessionId]);
 
-  const onChange = useCallback(
-    (elements: readonly unknown[]) => {
-      if (!ready.current) return;
-      const live = elements.filter((el) => !(el as { isDeleted?: boolean }).isDeleted);
-      if (live.length === 0 && baseline.current > 0) {
-        if (statusRef.current) statusRef.current.textContent = "Lege save geblokkeerd";
-        return;
-      }
-
+  const persistDoc = useCallback(
+    (next: WorkshopSketchDoc) => {
+      docRef.current = next;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (statusRef.current) statusRef.current.textContent = "Opslaan…";
-
       saveTimer.current = setTimeout(() => {
-        const scene: ExcalidrawScene = {
-          type: "excalidraw",
-          version: 2,
-          elements: elements as unknown[],
-          appState: { viewBackgroundColor: "#f7f6f2" },
-          files: {},
-        };
         void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save-sketch", sketch: scene }),
+          body: JSON.stringify({ action: "save-sketch", sketch: next }),
         }).then((r) => {
-          if (r.ok) {
-            baseline.current = live.length;
-            if (statusRef.current) statusRef.current.textContent = "Opgeslagen";
-          } else if (statusRef.current) {
-            statusRef.current.textContent = "Save mislukt";
+          if (mode === "free" && freeStatus.current) {
+            freeStatus.current.textContent = r.ok ? "Opgeslagen" : "Save mislukt";
           }
         });
-      }, 900);
+      }, 500);
     },
-    [sessionId]
+    [mode, sessionId]
   );
 
-  const uiOptions = useMemo(
-    () => ({
-      canvasActions: {
-        changeViewBackgroundColor: true,
-        clearCanvas: false,
-        export: false,
-        loadScene: false,
-        saveToActiveFile: false,
-        toggleTheme: false,
-        saveAsImage: true,
-      },
-    }),
-    []
+  const onSaveFlow = useCallback(
+    (nextFlow: FlowSketch) => {
+      const base = docRef.current ?? {
+        type: "workshop-sketch-v2" as const,
+        flow: nextFlow,
+        freehand: freehand,
+      };
+      const next = { ...base, flow: nextFlow };
+      setFlow(nextFlow);
+      persistDoc(next);
+    },
+    [freehand, persistDoc]
   );
+
+  const onFreeChange = useCallback(
+    (elements: readonly unknown[]) => {
+      if (freeStatus.current) freeStatus.current.textContent = "Opslaan…";
+      const scene: ExcalidrawScene = {
+        type: "excalidraw",
+        version: 2,
+        elements: elements as unknown[],
+        appState: { viewBackgroundColor: "#f7f6f2" },
+        files: {},
+      };
+      setFreehand(scene);
+      const base = docRef.current ?? {
+        type: "workshop-sketch-v2" as const,
+        flow: flow ?? createDefaultSophistaFlow(),
+        freehand: scene,
+      };
+      persistDoc({ ...base, freehand: scene });
+    },
+    [flow, persistDoc]
+  );
+
+  const freeInitial = useMemo(() => {
+    if (!freehand) {
+      return {
+        elements: [],
+        appState: { viewBackgroundColor: "#f7f6f2" },
+        scrollToContent: true,
+      };
+    }
+    return {
+      elements: freehand.elements,
+      appState: { viewBackgroundColor: "#f7f6f2", ...(freehand.appState || {}) },
+      scrollToContent: true,
+    };
+  }, [freehand]);
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#f7f6f2] px-6 text-center text-sm text-[#151f28]">
+      <div className="flex h-full items-center justify-center bg-[#f3f1eb] px-6 text-sm text-[#151f28]">
         {error}
       </div>
     );
   }
 
-  if (!initialData) {
+  if (!flow) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#f7f6f2] text-sm text-[#151f28]/50">
-        Tekenvlak laden…
+      <div className="flex h-full items-center justify-center bg-[#f3f1eb] text-sm text-[#151f28]/50">
+        Proces laden…
       </div>
     );
   }
 
   return (
-    <div className="relative h-full w-full bg-[#f7f6f2]">
-      <div className="absolute inset-0">
-        <Excalidraw
-          initialData={initialData as never}
-          onChange={onChange as never}
-          UIOptions={uiOptions as never}
-          theme="light"
-          langCode="nl-NL"
-        />
-      </div>
-      <div className="pointer-events-none absolute bottom-3 left-3 z-50">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full bg-[#151f28]/92 px-3 py-1.5 text-[11px] text-white shadow-lg ring-1 ring-white/10">
-          <span className="font-medium">Schets</span>
-          <span className="h-3 w-px bg-white/20" />
-          <span ref={statusRef} className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00]">
-            …
-          </span>
+    <div className="flex h-full flex-col bg-[#f3f1eb]">
+      <div className="z-30 flex shrink-0 items-center gap-2 border-b border-black/8 bg-white/90 px-3 py-2 backdrop-blur">
+        <div className="flex rounded-full bg-[#151f28]/5 p-1 ring-1 ring-black/10">
+          <button
+            type="button"
+            onClick={() => setMode("flow")}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+              mode === "flow" ? "bg-[#ceff00] text-[#151f28]" : "text-[#151f28]/55 hover:text-[#151f28]"
+            }`}
+          >
+            Proces (pijlen)
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("free")}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold transition ${
+              mode === "free" ? "bg-[#ceff00] text-[#151f28]" : "text-[#151f28]/55 hover:text-[#151f28]"
+            }`}
+          >
+            Vrij tekenen
+          </button>
         </div>
+        <p className="hidden text-[11px] text-[#151f28]/45 sm:block">
+          {mode === "flow"
+            ? "Blokken verbinden via de bolletjes — ideaal voor de flowchart"
+            : "Vrij schetsen / annoteren naast het proces"}
+        </p>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        {mode === "flow" ? (
+          <ProcessFlowEditor initial={flow} onSave={onSaveFlow} />
+        ) : (
+          <div className="absolute inset-0">
+            <Excalidraw
+              // remount when switching into free so initialData applies once per visit
+              key={freehand ? "free-saved" : "free-empty"}
+              initialData={freeInitial as never}
+              onChange={onFreeChange as never}
+              theme="light"
+              UIOptions={
+                {
+                  canvasActions: {
+                    loadScene: false,
+                    export: false,
+                    clearCanvas: true,
+                    saveAsImage: true,
+                  },
+                } as never
+              }
+            />
+            <div className="pointer-events-none absolute bottom-3 left-3 z-50">
+              <div className="rounded-full bg-[#151f28]/92 px-3 py-1.5 text-[11px] text-white shadow-lg">
+                <span className="font-medium">Vrij</span>
+                <span className="mx-2 text-white/25">|</span>
+                <span ref={freeStatus} className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00]">
+                  Klaar
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
