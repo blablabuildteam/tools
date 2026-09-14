@@ -43,6 +43,10 @@ body {
   height: 100% !important;
 }
 
+.prep-flow {
+  overscroll-behavior: none;
+}
+
 .prep-flow:not(.is-dragging) .react-flow__node:not(.react-flow__node-sticky) {
   transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }

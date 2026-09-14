@@ -365,7 +365,6 @@ function layoutNodes(
         draggable: false,
         selectable: true,
         connectable: false,
-        className: "nopan",
         style: { zIndex: 4, width: STEP_W, height: ADD_AI_H },
       });
       y += ADD_AI_H + LANE_PAD;
@@ -1105,7 +1104,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
 
 function AddStepNode(_props: NodeProps<Node<AddData>>) {
   return (
-    <div className="nodrag nopan nowheel flex h-[44px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/20 bg-white text-[12px] font-semibold text-[#151f28]/70 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#151f28]/[0.03]">
+    <div className="nodrag flex h-[44px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/20 bg-white text-[12px] font-semibold text-[#151f28]/70 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#151f28]/[0.03]">
       <Plus className="h-3.5 w-3.5" /> Stap toevoegen
     </div>
   );
@@ -1113,7 +1112,7 @@ function AddStepNode(_props: NodeProps<Node<AddData>>) {
 
 function RevealAiNode({ data }: NodeProps<Node<RevealData>>) {
   return (
-    <div className="nodrag nopan nowheel flex h-[52px] w-[252px] flex-col justify-end">
+    <div className="nodrag flex h-[52px] w-[252px] flex-col justify-end">
       <div className="mx-3 h-px bg-[#151f28]/15" />
       <div
         className={`mt-2 flex h-[36px] items-center justify-center gap-1.5 rounded-xl text-[11px] font-semibold transition-colors duration-200 ${
@@ -1205,7 +1204,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
 
 function AddAiNode(_props: NodeProps<Node<AddData>>) {
   return (
-    <div className="nodrag nopan nowheel flex h-[36px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-[#ceff00]/35 text-[11px] font-semibold text-[#151f28]/75 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#ceff00]/50">
+    <div className="nodrag flex h-[36px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-[#ceff00]/35 text-[11px] font-semibold text-[#151f28]/75 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#ceff00]/50">
       <Sparkles className="h-3.5 w-3.5" /> AI-kans
     </div>
   );
