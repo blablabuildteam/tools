@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { KV_READY, normalizeSessionId, redisCommand } from "@/lib/kv";
 import { hashPassword, unlockToken, verifyPassword } from "@/lib/password";
 import {
+  applySketchPatch,
   createEmptyMeta,
+  isSketchPatchKey,
   publicMeta,
+  type SketchPatchKey,
   type WorkshopCard,
   type WorkshopIntro,
   type WorkshopMeta,
@@ -43,9 +46,32 @@ async function getRaw(sessionId: string): Promise<WorkshopSession | null> {
 
 async function saveSession(sessionId: string, session: WorkshopSession): Promise<void> {
   const key = KEY(sessionId);
+  session.rev = (session.rev ?? 0) + 1;
   session.meta.updatedAt = new Date().toISOString();
   await redisCommand("SET", key, JSON.stringify(session));
   await redisCommand("EXPIRE", key, String(TTL));
+}
+
+/** Re-read if another writer landed between load and save (workshop-scale CAS). */
+async function mutateSession(
+  sessionId: string,
+  mutator: (session: WorkshopSession) => void
+): Promise<WorkshopSession> {
+  let session = (await getRaw(sessionId)) ?? emptySession();
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const startRev = session.rev ?? 0;
+    mutator(session);
+    if (attempt < 4) {
+      const latest = (await getRaw(sessionId)) ?? emptySession();
+      if ((latest.rev ?? 0) !== startRev) {
+        session = latest;
+        continue;
+      }
+    }
+    await saveSession(sessionId, session);
+    return session;
+  }
+  return session;
 }
 
 function emptySession(partial?: Partial<WorkshopMeta>): WorkshopSession {
@@ -61,6 +87,7 @@ function clientPayload(session: WorkshopSession, unlocked: boolean) {
     meta: publicMeta(session.meta),
     cards: session.cards,
     sketch: session.sketch,
+    rev: session.rev ?? 0,
     kv: true,
     unlocked,
     requiresPassword: session.meta.passwordProtected && !unlocked,
@@ -97,9 +124,26 @@ export async function GET(
         meta: publicMeta(session.meta),
         cards: [],
         sketch: null,
+        rev: session.rev ?? 0,
         kv: true,
         unlocked: false,
         requiresPassword: true,
+      });
+    }
+    const since = req.nextUrl.searchParams.get("rev");
+    const currentRev = typeof session.rev === "number" ? session.rev : null;
+    if (
+      since !== null &&
+      currentRev !== null &&
+      Number.isFinite(Number(since)) &&
+      Number(since) === currentRev
+    ) {
+      return noStore({
+        unchanged: true,
+        rev: currentRev,
+        kv: true,
+        unlocked: true,
+        requiresPassword: false,
       });
     }
     await redisCommand("EXPIRE", KEY(params.sessionId), String(TTL));
@@ -150,6 +194,7 @@ type Body =
   | {
       action: "save-sketch";
       sketch: unknown;
+      touched?: SketchPatchKey[];
     }
   | {
       action: "update-summary";
@@ -226,65 +271,79 @@ export async function PUT(
     if (body.action === "update-meta") {
       const nextPassword = body.password;
       const incomingIntro = body.meta.intro;
-      session.meta = {
-        ...session.meta,
-        ...body.meta,
-        intro: incomingIntro ?? session.meta.intro,
-        passwordHash: session.meta.passwordHash,
-        passwordProtected: session.meta.passwordProtected,
-      };
-      if (nextPassword === null) {
-        session.meta.passwordProtected = false;
-        session.meta.passwordHash = undefined;
-      } else if (typeof nextPassword === "string" && nextPassword.trim()) {
-        session.meta.passwordProtected = true;
-        session.meta.passwordHash = hashPassword(nextPassword.trim());
-      }
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        next.meta = {
+          ...next.meta,
+          ...body.meta,
+          intro: incomingIntro ?? next.meta.intro,
+          passwordHash: next.meta.passwordHash,
+          passwordProtected: next.meta.passwordProtected,
+        };
+        if (nextPassword === null) {
+          next.meta.passwordProtected = false;
+          next.meta.passwordHash = undefined;
+        } else if (typeof nextPassword === "string" && nextPassword.trim()) {
+          next.meta.passwordProtected = true;
+          next.meta.passwordHash = hashPassword(nextPassword.trim());
+        }
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "update-intro") {
-      session.meta = {
-        ...session.meta,
-        intro: body.intro,
-      };
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        next.meta = {
+          ...next.meta,
+          intro: body.intro,
+        };
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "upsert-card") {
-      const idx = session.cards.findIndex((c) => c.id === body.card.id);
-      if (idx >= 0) session.cards[idx] = body.card;
-      else session.cards.push(body.card);
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        const idx = next.cards.findIndex((c) => c.id === body.card.id);
+        if (idx >= 0) next.cards[idx] = body.card;
+        else next.cards.push(body.card);
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "delete-card") {
-      session.cards = session.cards.filter((c) => c.id !== body.id);
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        next.cards = next.cards.filter((c) => c.id !== body.id);
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "replace-cards") {
-      session.cards = body.cards;
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        next.cards = body.cards;
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "save-sketch") {
-      session.sketch = body.sketch;
-      await saveSession(params.sessionId, session);
+      const touched = Array.isArray(body.touched)
+        ? body.touched.filter(isSketchPatchKey)
+        : [];
+      session = await mutateSession(params.sessionId, (next) => {
+        if (touched.length > 0) {
+          next.sketch = applySketchPatch(next.sketch, body.sketch, touched);
+        } else {
+          next.sketch = body.sketch;
+        }
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 
     if (body.action === "update-summary") {
-      session.meta = {
-        ...session.meta,
-        summary: body.summary,
-      };
-      await saveSession(params.sessionId, session);
+      session = await mutateSession(params.sessionId, (next) => {
+        next.meta = {
+          ...next.meta,
+          summary: body.summary,
+        };
+      });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }
 

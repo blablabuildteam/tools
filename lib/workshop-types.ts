@@ -72,6 +72,8 @@ export type WorkshopSession = {
   meta: WorkshopMeta;
   cards: WorkshopCard[];
   sketch: unknown | null;
+  /** Monotonic write counter for cheap poll short-circuit. */
+  rev?: number;
 };
 
 export const CARD_COLORS = [
@@ -364,6 +366,72 @@ export type PrepPhaseSketch = {
   showAiKansen?: boolean;
   revealedAiMilestoneIds?: string[];
 };
+
+export const SKETCH_PATCH_KEYS = [
+  "steps",
+  "connections",
+  "aiIdeas",
+  "milestones",
+  "stickies",
+  "showAiKansen",
+  "revealedAiMilestoneIds",
+] as const;
+
+export type SketchPatchKey = (typeof SKETCH_PATCH_KEYS)[number];
+
+export function isSketchPatchKey(value: unknown): value is SketchPatchKey {
+  return typeof value === "string" && (SKETCH_PATCH_KEYS as readonly string[]).includes(value);
+}
+
+export function sketchFingerprint(doc: PrepPhaseSketch): string {
+  return JSON.stringify({
+    steps: doc.steps,
+    connections: doc.connections,
+    aiIdeas: doc.aiIdeas,
+    milestones: doc.milestones,
+    stickies: doc.stickies,
+    showAiKansen: doc.showAiKansen === true,
+    revealedAiMilestoneIds: doc.revealedAiMilestoneIds ?? [],
+  });
+}
+
+export function applySketchPatch(
+  stored: unknown,
+  incoming: unknown,
+  touched: SketchPatchKey[]
+): PrepPhaseSketch {
+  const current = normalizePrepPhase(stored) ?? createEmptyPrepPhase();
+  const patch =
+    incoming && typeof incoming === "object" ? (incoming as Partial<PrepPhaseSketch>) : {};
+  const next: PrepPhaseSketch = { ...current };
+  for (const key of touched) {
+    if (key === "showAiKansen") {
+      next.showAiKansen = patch.showAiKansen === true;
+    } else if (key === "revealedAiMilestoneIds") {
+      next.revealedAiMilestoneIds = Array.isArray(patch.revealedAiMilestoneIds)
+        ? patch.revealedAiMilestoneIds.map(String).filter(Boolean)
+        : [];
+    } else if (key === "steps" && Array.isArray(patch.steps)) {
+      next.steps = patch.steps.map(normalizePrepStep);
+    } else if (key === "connections" && Array.isArray(patch.connections)) {
+      next.connections = patch.connections;
+    } else if (key === "aiIdeas" && Array.isArray(patch.aiIdeas)) {
+      next.aiIdeas = patch.aiIdeas;
+    } else if (key === "milestones" && Array.isArray(patch.milestones)) {
+      next.milestones = patch.milestones.map((m, i) => ({
+        id: String(m.id),
+        short: m.short || "Milestone",
+        title: m.title || "",
+        order: typeof m.order === "number" ? m.order : i,
+      }));
+    } else if (key === "stickies" && Array.isArray(patch.stickies)) {
+      next.stickies = patch.stickies
+        .map(normalizeSticky)
+        .filter((s): s is PrepSticky => Boolean(s));
+    }
+  }
+  return next;
+}
 
 export function asChipList(value: unknown): string[] {
   if (Array.isArray(value)) {
