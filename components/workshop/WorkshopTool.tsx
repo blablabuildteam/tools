@@ -68,6 +68,7 @@ export default function WorkshopTool() {
   const [cards, setCards] = useState<WorkshopCard[]>([]);
   const [sketch, setSketch] = useState<unknown | null>(null);
   const [sketchOpened, setSketchOpened] = useState(false);
+  const [sketchGen, setSketchGen] = useState(0);
   const [kv, setKv] = useState(true);
   const [locked, setLocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -83,8 +84,12 @@ export default function WorkshopTool() {
 
   function openSketch() {
     sketchDirty.current = true;
+    const fromKansen = tabRef.current === "reference";
     setSketchOpened(true);
     setTab("sketch");
+    if (fromKansen) {
+      window.setTimeout(() => setSketchGen((g) => g + 1), 500);
+    }
   }
 
   useEffect(() => {
@@ -508,7 +513,7 @@ export default function WorkshopTool() {
                 { id: "intro" as const, label: "Intro", icon: BookOpen },
                 { id: "sketch" as const, label: "Schets", icon: Pencil },
                 { id: "board" as const, label: "Notities", icon: LayoutGrid },
-                { id: "reference" as const, label: "Richtingen", icon: Sparkles },
+                { id: "reference" as const, label: "AI-kansen", icon: Sparkles },
                 { id: "wrap" as const, label: "Afronding", icon: ClipboardCheck },
               ] as const
             ).map(({ id, label, icon: Icon }) => {
@@ -571,7 +576,7 @@ export default function WorkshopTool() {
         </div>
 
         <div className={`h-full overflow-y-auto ${tab === "reference" ? "" : "hidden"}`}>
-          <WorkshopReferenceView />
+          <WorkshopReferenceView sessionId={sessionId} active={tab === "reference"} />
         </div>
 
         <div className={`h-full overflow-y-auto ${tab === "wrap" ? "" : "hidden"}`}>
@@ -590,7 +595,12 @@ export default function WorkshopTool() {
             }
             aria-hidden={tab !== "sketch"}
           >
-            <WorkshopSketch sessionId={sessionId} active={tab === "sketch"} />
+            <WorkshopSketch
+              key={sketchGen}
+              sessionId={sessionId}
+              active={tab === "sketch"}
+              reloadToken={sketchGen}
+            />
           </div>
         )}
       </div>

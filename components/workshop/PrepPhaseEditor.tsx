@@ -50,6 +50,7 @@ const LANE_PAD = 14;
 const AI_H = 158;
 const AI_GAP = 10;
 const ADD_AI_H = 36;
+const REVEAL_H = 52;
 const STICKY_W = 176;
 
 const LANE_TONES = [
@@ -67,6 +68,7 @@ const LANE_TONES = [
 type LaneData = { index: number };
 type MilestoneData = PrepMilestone & { index: number };
 type AddData = { milestoneId: PrepMilestoneId };
+type RevealData = { milestoneId: PrepMilestoneId; open: boolean; count: number };
 type ChipKind = "person" | "party" | "tool";
 
 type EditorCtx = {
@@ -86,6 +88,9 @@ type EditorCtx = {
   peopleByMilestone: Record<PrepMilestoneId, string[]>;
   partiesByMilestone: Record<PrepMilestoneId, string[]>;
   toolsByMilestone: Record<PrepMilestoneId, string[]>;
+  showAiKansen: boolean;
+  revealedAiMilestoneIds: string[];
+  toggleAiColumn: (milestoneId: PrepMilestoneId) => void;
 };
 
 const EditorContext = createContext<EditorCtx | null>(null);
@@ -99,6 +104,12 @@ function useEditor() {
 function parseHours(raw: string): number {
   const n = Number(String(raw).trim().replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function formatHours(n: number): string {
+  if (n <= 0) return "0 uur";
+  const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
+  return `${label} uur`;
 }
 
 function uniqueChipsByMilestone(
@@ -149,12 +160,18 @@ function measured(heights: Record<string, number>, id: string, fallback: number)
   return heights[id] ?? fallback;
 }
 
+function isAiOpen(milestoneId: PrepMilestoneId, showAll: boolean, revealed: string[]) {
+  return showAll || revealed.includes(milestoneId);
+}
+
 function layoutNodes(
   milestones: PrepMilestone[],
   steps: PrepStep[],
   aiIdeas: PrepAiIdea[],
   heights: Record<string, number> = {},
-  stickies: PrepSticky[] = []
+  stickies: PrepSticky[] = [],
+  showAiKansen = false,
+  revealedIds: string[] = []
 ): Node[] {
   const cols = [...milestones].sort((a, b) => a.order - b.order);
   const byCol = new Map<PrepMilestoneId, PrepStep[]>();
@@ -178,29 +195,6 @@ function layoutNodes(
     const columnNodes: Node[] = [];
     let y = columnContentY(heights, m.id);
 
-    ideas.forEach((idea) => {
-      columnNodes.push({
-        id: idea.id,
-        type: "ai-idea",
-        position: { x, y },
-        data: idea,
-        dragHandle: ".ai-drag",
-        style: { zIndex: 3, width: STEP_W },
-      });
-      y += measured(heights, idea.id, AI_H) + AI_GAP;
-    });
-    columnNodes.push({
-      id: `add-ai-${m.id}`,
-      type: "add-ai",
-      position: { x, y },
-      data: { milestoneId: m.id },
-      draggable: false,
-      selectable: true,
-      connectable: false,
-      className: "nopan",
-      style: { zIndex: 4, width: STEP_W, height: ADD_AI_H },
-    });
-    y += ADD_AI_H + 10;
     col.forEach((step) => {
       columnNodes.push({
         id: step.id,
@@ -223,7 +217,45 @@ function layoutNodes(
       className: "nopan",
       style: { zIndex: 4, width: STEP_W, height: ADD_H },
     });
-    y += ADD_H + LANE_PAD;
+    y += ADD_H + 8;
+    const aiOpen = isAiOpen(m.id, showAiKansen, revealedIds);
+    columnNodes.push({
+      id: `reveal-ai-${m.id}`,
+      type: "reveal-ai",
+      position: { x, y },
+      data: { milestoneId: m.id, open: aiOpen, count: ideas.length },
+      draggable: false,
+      selectable: true,
+      connectable: false,
+      className: "nopan",
+      style: { zIndex: 4, width: STEP_W, height: REVEAL_H },
+    });
+    y += REVEAL_H + (aiOpen ? 8 : LANE_PAD);
+    if (aiOpen) {
+      ideas.forEach((idea) => {
+        columnNodes.push({
+          id: idea.id,
+          type: "ai-idea",
+          position: { x, y },
+          data: idea,
+          dragHandle: ".ai-drag",
+          style: { zIndex: 3, width: STEP_W },
+        });
+        y += measured(heights, idea.id, AI_H) + AI_GAP;
+      });
+      columnNodes.push({
+        id: `add-ai-${m.id}`,
+        type: "add-ai",
+        position: { x, y },
+        data: { milestoneId: m.id },
+        draggable: false,
+        selectable: true,
+        connectable: false,
+        className: "nopan",
+        style: { zIndex: 4, width: STEP_W, height: ADD_AI_H },
+      });
+      y += ADD_AI_H + LANE_PAD;
+    }
     const height = Math.max(560, y - ORIGIN_Y);
 
     nodes.push({
@@ -335,6 +367,8 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
     partiesByMilestone,
     toolsByMilestone,
     patchMilestone,
+    showAiKansen,
+    revealedAiMilestoneIds,
   } = useEditor();
   const boxRef = useReportHeight(id);
   const hours = hoursByMilestone[data.id] ?? 0;
@@ -343,6 +377,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
   const parties = partiesByMilestone[data.id] ?? [];
   const tools = toolsByMilestone[data.id] ?? [];
   const n = data.index + 1;
+  const aiOpen = isAiOpen(data.id, showAiKansen, revealedAiMilestoneIds);
 
   return (
     <div
@@ -365,7 +400,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {aiCount > 0 && (
+          {aiOpen && aiCount > 0 && (
             <p className="rounded-full bg-[#ceff00]/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#ceff00]">
               {aiCount} AI
             </p>
@@ -659,6 +694,27 @@ function AddStepNode(_props: NodeProps<Node<AddData>>) {
   );
 }
 
+function RevealAiNode({ data }: NodeProps<Node<RevealData>>) {
+  return (
+    <div className="nodrag nopan nowheel flex h-[52px] w-[252px] flex-col justify-end">
+      <div className="mx-3 h-px bg-[#151f28]/15" />
+      <div
+        className={`mt-2 flex h-[36px] items-center justify-center gap-1.5 rounded-xl text-[11px] font-semibold transition-colors duration-200 ${
+          data.open
+            ? "bg-white text-[#151f28]/55 ring-1 ring-black/10 hover:bg-[#151f28]/[0.03]"
+            : "bg-[#ceff00] text-[#151f28] shadow-sm hover:bg-[#d8ff33]"
+        }`}
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        {data.open ? "Verberg AI-kansen" : "Toon AI-kansen"}
+        {!data.open && data.count > 0 ? (
+          <span className="rounded-full bg-[#151f28]/10 px-1.5 py-px font-mono text-[10px]">{data.count}</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
   const { patchAi, deleteAi } = useEditor();
   const boxRef = useReportHeight(id);
@@ -679,7 +735,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
         <button
           type="button"
           className="ai-drag mt-0.5 cursor-grab rounded p-0.5 text-[#151f28]/35 hover:text-[#151f28]/70"
-          aria-label="Sleep AI-oplossing"
+          aria-label="Sleep AI-kans"
         >
           <GripVertical className="h-4 w-4" />
         </button>
@@ -687,7 +743,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
           <div className="flex items-center gap-1">
             <Sparkles className="h-3 w-3 shrink-0 text-[#151f28]/70" />
             <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/55">
-              AI-oplossing
+              AI-kans
             </span>
             {data.known && (
               <span className="rounded-full bg-[#151f28]/10 px-1.5 py-px text-[9px] font-semibold text-[#151f28]/70">
@@ -698,7 +754,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
           <input
             value={data.title}
             onChange={(e) => patchAi(id, { title: e.target.value })}
-            placeholder="Titel van de AI-oplossing"
+            placeholder="Titel van de AI-kans"
             className="nodrag mt-1 w-full bg-transparent text-[13px] font-semibold text-[#151f28] outline-none placeholder:text-[#151f28]/35"
           />
         </div>
@@ -706,7 +762,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
           type="button"
           onClick={exit}
           className="nodrag rounded p-0.5 text-[#151f28]/30 hover:text-red-600"
-          aria-label="AI-oplossing verwijderen"
+          aria-label="AI-kans verwijderen"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -733,7 +789,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
 function AddAiNode(_props: NodeProps<Node<AddData>>) {
   return (
     <div className="nodrag nopan nowheel flex h-[36px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-[#ceff00]/35 text-[11px] font-semibold text-[#151f28]/75 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#ceff00]/50">
-      <Sparkles className="h-3.5 w-3.5" /> AI-oplossing
+      <Sparkles className="h-3.5 w-3.5" /> AI-kans
     </div>
   );
 }
@@ -812,6 +868,7 @@ const nodeTypes = {
   "add-milestone": AddMilestoneNode,
   "prep-step": StepNode,
   "add-step": AddStepNode,
+  "reveal-ai": RevealAiNode,
   "ai-idea": AiIdeaNode,
   "add-ai": AddAiNode,
   sticky: StickyNode,
@@ -911,24 +968,30 @@ function reorderMilestones(list: PrepMilestone[], id: string, insertAt: number):
   return rest.map((m, i) => ({ ...m, order: i }));
 }
 
+function stepsBlockHeight(
+  heights: Record<string, number>,
+  steps: { id: string }[]
+) {
+  let h = 0;
+  for (const step of steps) h += measured(heights, step.id, STEP_H) + STEP_GAP;
+  return h + ADD_H + 8 + REVEAL_H + 8;
+}
+
 function dropSlot(
   node: Node,
   steps: PrepStep[],
   ideas: PrepAiIdea[],
   heights: Record<string, number>,
-  milestones: PrepMilestone[]
+  milestones: PrepMilestone[],
+  showAiKansen: boolean,
+  revealedIds: string[]
 ): { kind: "prep-step" | "ai-idea"; milestoneId: PrepMilestoneId; insertAt: number } | null {
   const milestoneId = snapToColumn(node.position.x, milestones);
   if (node.type === "prep-step") {
-    const colIdeas = ideas
-      .filter((a) => a.milestoneId === milestoneId)
-      .sort((a, b) => a.order - b.order);
-    let startY = columnContentY(heights, milestoneId);
-    for (const idea of colIdeas) startY += measured(heights, idea.id, AI_H) + AI_GAP;
-    startY += ADD_AI_H + 10;
     const siblings = steps
       .filter((s) => s.milestoneId === milestoneId && s.id !== node.id)
       .sort((a, b) => a.order - b.order);
+    const startY = columnContentY(heights, milestoneId);
     const centerY = node.position.y + measured(heights, node.id, STEP_H) / 2;
     return {
       kind: "prep-step",
@@ -937,10 +1000,14 @@ function dropSlot(
     };
   }
   if (node.type === "ai-idea") {
+    if (!isAiOpen(milestoneId, showAiKansen, revealedIds)) return null;
+    const colSteps = steps
+      .filter((s) => s.milestoneId === milestoneId)
+      .sort((a, b) => a.order - b.order);
     const siblings = ideas
       .filter((a) => a.milestoneId === milestoneId && a.id !== node.id)
       .sort((a, b) => a.order - b.order);
-    const startY = columnContentY(heights, milestoneId);
+    const startY = columnContentY(heights, milestoneId) + stepsBlockHeight(heights, colSteps);
     const centerY = node.position.y + measured(heights, node.id, AI_H) / 2;
     return {
       kind: "ai-idea",
@@ -984,6 +1051,10 @@ function FlowCanvas({ initial, onSave }: Props) {
     () => initial.milestones ?? createDefaultPrepMilestones()
   );
   const [stickyList, setStickyList] = useState<PrepSticky[]>(() => initial.stickies ?? []);
+  const [showAiKansen, setShowAiKansen] = useState(() => initial.showAiKansen === true);
+  const [revealedAiIds, setRevealedAiIds] = useState<string[]>(
+    () => initial.revealedAiMilestoneIds ?? []
+  );
   const [edges, setEdges, onEdgesChange] = useEdgesState(toRfEdges(initial.connections, initial.steps));
   const [nodes, setNodes, onNodesChange] = useNodesState(
     layoutNodes(
@@ -991,7 +1062,9 @@ function FlowCanvas({ initial, onSave }: Props) {
       initial.steps.map(normalizePrepStep),
       initial.aiIdeas ?? [],
       {},
-      initial.stickies ?? []
+      initial.stickies ?? [],
+      initial.showAiKansen === true,
+      initial.revealedAiMilestoneIds ?? []
     )
   );
   const dragging = useRef(false);
@@ -1005,6 +1078,8 @@ function FlowCanvas({ initial, onSave }: Props) {
   const aiRef = useRef(aiList);
   const milestonesRef = useRef(milestones);
   const stickiesRef = useRef(stickyList);
+  const showAiRef = useRef(showAiKansen);
+  const revealedAiRef = useRef(revealedAiIds);
   const edgesRef = useRef(edges);
   const heightsRef = useRef<Record<string, number>>({});
   const pendingStickyFocus = useRef<string | null>(null);
@@ -1013,6 +1088,8 @@ function FlowCanvas({ initial, onSave }: Props) {
   aiRef.current = aiList;
   milestonesRef.current = milestones;
   stickiesRef.current = stickyList;
+  showAiRef.current = showAiKansen;
+  revealedAiRef.current = revealedAiIds;
   edgesRef.current = edges;
 
   const reportHeight = useCallback((id: string, height: number) => {
@@ -1034,6 +1111,8 @@ function FlowCanvas({ initial, onSave }: Props) {
         aiIdeas: aiRef.current,
         milestones: milestonesRef.current,
         stickies: stickiesRef.current,
+        showAiKansen: showAiRef.current,
+        revealedAiMilestoneIds: revealedAiRef.current,
       });
       if (statusRef.current) statusRef.current.textContent = "Opgeslagen";
     }, 400);
@@ -1044,6 +1123,8 @@ function FlowCanvas({ initial, onSave }: Props) {
     stepList.map((s) => `${s.id}:${s.milestoneId}:${s.order}`).join("|"),
     aiList.map((a) => `${a.id}:${a.milestoneId}:${a.order}`).join("|"),
     stickyList.map((s) => s.id).join("|"),
+    showAiKansen ? "ai-on" : "ai-off",
+    revealedAiIds.join(","),
   ].join("||");
 
   const applyLayout = useCallback(() => {
@@ -1052,7 +1133,9 @@ function FlowCanvas({ initial, onSave }: Props) {
       stepsRef.current,
       aiRef.current,
       heightsRef.current,
-      stickiesRef.current
+      stickiesRef.current,
+      showAiRef.current,
+      revealedAiRef.current
     );
     const id = dragId.current;
     if (!dragging.current || !id) {
@@ -1356,6 +1439,28 @@ function FlowCanvas({ initial, onSave }: Props) {
     return totals;
   }, [aiList, milestones]);
 
+  const toggleAiColumn = useCallback(
+    (milestoneId: PrepMilestoneId) => {
+      if (showAiRef.current) {
+        showAiRef.current = false;
+        setShowAiKansen(false);
+        const next = milestonesRef.current.map((m) => m.id).filter((id) => id !== milestoneId);
+        revealedAiRef.current = next;
+        setRevealedAiIds(next);
+      } else if (revealedAiRef.current.includes(milestoneId)) {
+        const next = revealedAiRef.current.filter((id) => id !== milestoneId);
+        revealedAiRef.current = next;
+        setRevealedAiIds(next);
+      } else {
+        const next = [...revealedAiRef.current, milestoneId];
+        revealedAiRef.current = next;
+        setRevealedAiIds(next);
+      }
+      persist();
+    },
+    [persist]
+  );
+
   const ctx = useMemo<EditorCtx>(
     () => ({
       patchStep,
@@ -1369,6 +1474,9 @@ function FlowCanvas({ initial, onSave }: Props) {
       peopleByMilestone,
       partiesByMilestone,
       toolsByMilestone,
+      showAiKansen,
+      revealedAiMilestoneIds: revealedAiIds,
+      toggleAiColumn,
       reportHeight,
       patchMilestone,
       addMilestone,
@@ -1390,7 +1498,10 @@ function FlowCanvas({ initial, onSave }: Props) {
       patchSticky,
       peopleByMilestone,
       partiesByMilestone,
+      revealedAiIds,
       reportHeight,
+      showAiKansen,
+      toggleAiColumn,
       toolsByMilestone,
     ]
   );
@@ -1432,7 +1543,9 @@ function FlowCanvas({ initial, onSave }: Props) {
       stepsRef.current,
       aiRef.current,
       heightsRef.current,
-      milestonesRef.current
+      milestonesRef.current,
+      showAiRef.current,
+      revealedAiRef.current
     );
     if (!slotInfo) return;
     const slot = `${slotInfo.kind}:${node.id}:${slotInfo.milestoneId}:${slotInfo.insertAt}`;
@@ -1490,6 +1603,9 @@ function FlowCanvas({ initial, onSave }: Props) {
             }
             if (node.type === "add-milestone") {
               addMilestone();
+            }
+            if (node.type === "reveal-ai") {
+              toggleAiColumn((node.data as RevealData).milestoneId);
             }
           }}
           onPaneClick={(e) => {
@@ -1602,6 +1718,23 @@ function FlowCanvas({ initial, onSave }: Props) {
             className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-[#FDE047] px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
           >
             <StickyNote className="h-3.5 w-3.5" /> Sticky
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showAiRef.current;
+              showAiRef.current = next;
+              setShowAiKansen(next);
+              persist();
+            }}
+            className={`pointer-events-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-lg ring-1 ${
+              showAiKansen
+                ? "bg-[#ceff00] text-[#151f28] ring-black/10"
+                : "bg-white text-[#151f28]/70 ring-black/10"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            {showAiKansen ? "Alle AI-kansen" : "Toon alle AI-kansen"}
           </button>
           <p className="self-center rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[#151f28]/55 ring-1 ring-black/5">
             Dubbelklik op het bord voor een sticky · Delete verwijdert

@@ -6,8 +6,8 @@ export const WORKSHOP_COLUMNS = [
   },
   {
     id: "directions",
-    title: "Richting #1",
-    hint: "Gekozen AI-richting + waarom die eerst",
+    title: "Kans #1",
+    hint: "Gekozen AI-kans + waarom die eerst",
   },
   {
     id: "tech",
@@ -361,6 +361,8 @@ export type PrepPhaseSketch = {
   aiIdeas: PrepAiIdea[];
   milestones: PrepMilestone[];
   stickies: PrepSticky[];
+  showAiKansen?: boolean;
+  revealedAiMilestoneIds?: string[];
 };
 
 export function asChipList(value: unknown): string[] {
@@ -426,6 +428,8 @@ export function createEmptyPrepPhase(): PrepPhaseSketch {
     aiIdeas: [],
     milestones: createDefaultPrepMilestones(),
     stickies: [],
+    showAiKansen: false,
+    revealedAiMilestoneIds: [],
   };
 }
 
@@ -442,6 +446,8 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
     aiIdeas?: PrepAiIdea[];
     milestones?: PrepMilestone[];
     stickies?: unknown;
+    showAiKansen?: unknown;
+    revealedAiMilestoneIds?: unknown;
   };
   const milestones =
     Array.isArray(doc.milestones) && doc.milestones.length > 0
@@ -460,6 +466,10 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
     milestones,
     stickies: Array.isArray(doc.stickies)
       ? doc.stickies.map(normalizeSticky).filter((s): s is PrepSticky => Boolean(s))
+      : [],
+    showAiKansen: doc.showAiKansen === true,
+    revealedAiMilestoneIds: Array.isArray(doc.revealedAiMilestoneIds)
+      ? doc.revealedAiMilestoneIds.map(String).filter(Boolean)
       : [],
   };
 }

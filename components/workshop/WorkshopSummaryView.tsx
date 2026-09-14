@@ -28,7 +28,7 @@ const FIELDS: {
   {
     key: "priorityOne",
     label: "Prioriteit #1",
-    hint: "Welke AI-richting eerst, en waarom die?",
+    hint: "Welke AI-kans eerst, en waarom die?",
     rows: 3,
   },
   {
