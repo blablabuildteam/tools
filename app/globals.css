@@ -158,11 +158,16 @@ body {
   pointer-events: auto;
 }
 
-.react-flow__node-sticky {
+.react-flow__node-sticky,
+.react-flow__node-lane {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
   box-shadow: none !important;
+}
+
+.react-flow__node-prep-step {
+  overflow: visible !important;
 }
 
 .prep-sticky-paper {
