@@ -582,7 +582,7 @@ export default function WorkshopTool() {
   }
 
   return (
-    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#0f1419] text-bla-white">
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden overscroll-none bg-[#0f1419] text-bla-white">
       <header className="z-30 shrink-0 border-b border-white/[0.07] bg-[#0f1419]/90 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-5">
           <Link

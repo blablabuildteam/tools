@@ -24,6 +24,7 @@
 html,
 body {
   min-height: 100%;
+  overscroll-behavior: none;
 }
 
 body {
@@ -43,7 +44,10 @@ body {
   height: 100% !important;
 }
 
-.prep-flow {
+.prep-flow,
+.prep-flow .react-flow,
+.prep-flow .react-flow__renderer,
+.prep-flow .react-flow__pane {
   overscroll-behavior: none;
 }
 

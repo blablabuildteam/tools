@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 /** Minimal chrome — only the canvas. */
 export default function DrawLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="m-0 h-[100dvh] w-screen overflow-hidden bg-[#f7f6f2] p-0">
+    <div className="m-0 h-[100dvh] w-screen overflow-hidden overscroll-none bg-[#f7f6f2] p-0">
       {children}
     </div>
   );

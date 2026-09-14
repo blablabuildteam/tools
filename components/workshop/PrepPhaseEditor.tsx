@@ -6,6 +6,7 @@ import {
   BaseEdge,
   Handle,
   MiniMap,
+  PanOnScrollMode,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -1058,7 +1059,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
               value={data.duration}
               onChange={(e) => patchStep(id, { duration: e.target.value })}
               placeholder="0"
-              className="nodrag bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
             />
             <span className="text-[13px] text-[#151f28]/45">uur</span>
@@ -2330,7 +2331,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           minZoom={0.28}
           maxZoom={1.35}
           panOnScroll
-          panOnScrollMode="free"
+          panOnScrollMode={PanOnScrollMode.Free}
           panOnScrollSpeed={1}
           zoomOnScroll={false}
           zoomOnPinch
@@ -2407,7 +2408,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
               type="button"
               aria-label="Inzoomen"
               onClick={() => zoomIn({ duration: 160 })}
-              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none"
             >
               <Plus className="h-4 w-4" strokeWidth={2.25} />
             </button>
@@ -2415,7 +2416,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
               type="button"
               aria-label="Uitzoomen"
               onClick={() => zoomOut({ duration: 160 })}
-              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none"
             >
               <Minus className="h-4 w-4" strokeWidth={2.25} />
             </button>
@@ -2424,7 +2425,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
               type="button"
               aria-label="Passend in beeld"
               onClick={fitToScreen}
-              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none"
             >
               <Scan className="h-4 w-4" strokeWidth={2.25} />
             </button>

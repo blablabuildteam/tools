@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 type Props = {
   sessionId: string;
@@ -14,16 +14,36 @@ type Props = {
  */
 export default function WorkshopSketch({ sessionId, active, reloadToken = 0 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  void active;
+
+  useEffect(() => {
+    if (!active) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overscrollBehavior;
+    const prevBody = body.style.overscrollBehavior;
+    html.style.overscrollBehavior = "none";
+    body.style.overscrollBehavior = "none";
+
+    const onWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaX) < 1 && !event.ctrlKey) return;
+      event.preventDefault();
+    };
+    window.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    return () => {
+      html.style.overscrollBehavior = prevHtml;
+      body.style.overscrollBehavior = prevBody;
+      window.removeEventListener("wheel", onWheel, { capture: true });
+    };
+  }, [active]);
 
   return (
-    <div className="absolute inset-0 bg-[#f7f6f2]">
+    <div className="absolute inset-0 overflow-hidden overscroll-none bg-[#f7f6f2]">
       <iframe
         ref={iframeRef}
         key={`${sessionId}-${reloadToken}`}
         title="Workshop schets"
-        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}&v=prep-30&r=${reloadToken}`}
-        className="h-full w-full border-0"
+        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}&v=prep-31&r=${reloadToken}`}
+        className="h-full w-full border-0 overscroll-none"
         allow="clipboard-read; clipboard-write"
       />
     </div>

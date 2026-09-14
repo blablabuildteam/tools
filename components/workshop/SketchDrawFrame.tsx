@@ -34,6 +34,34 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
   };
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    html.classList.add("overflow-hidden", "overscroll-none");
+    body.classList.add("overflow-hidden", "overscroll-none");
+
+    const onWheel = (event: WheelEvent) => {
+      const target = event.target as HTMLElement | null;
+      const allowNativeY =
+        Boolean(target?.closest(".nowheel")) &&
+        !event.ctrlKey &&
+        Math.abs(event.deltaX) <= Math.abs(event.deltaY);
+      if (allowNativeY) return;
+      event.preventDefault();
+    };
+    const preventGesture = (event: Event) => event.preventDefault();
+    document.addEventListener("wheel", onWheel, { capture: true, passive: false });
+    document.addEventListener("gesturestart", preventGesture, { capture: true });
+    document.addEventListener("gesturechange", preventGesture, { capture: true });
+    return () => {
+      html.classList.remove("overflow-hidden", "overscroll-none");
+      body.classList.remove("overflow-hidden", "overscroll-none");
+      document.removeEventListener("wheel", onWheel, { capture: true });
+      document.removeEventListener("gesturestart", preventGesture, { capture: true });
+      document.removeEventListener("gesturechange", preventGesture, { capture: true });
+    };
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
