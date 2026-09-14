@@ -145,20 +145,20 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
+              <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
               <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
                 {intro.attendees
-                  .filter((a) => a.org === "BlaBlaBuild")
+                  .filter((a) => a.org === "Sophista")
                   .map((a) => (
                     <AttendeeRow key={a.id} attendee={a} />
                   ))}
               </ul>
             </div>
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
+              <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
               <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
                 {intro.attendees
-                  .filter((a) => a.org === "Sophista")
+                  .filter((a) => a.org === "BlaBlaBuild")
                   .map((a) => (
                     <AttendeeRow key={a.id} attendee={a} />
                   ))}

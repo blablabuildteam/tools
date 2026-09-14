@@ -525,7 +525,7 @@ function ChipInput({
 
   return (
     <div className="flex min-w-0 items-start gap-1.5">
-      <Icon className="mt-1 h-3 w-3 shrink-0 text-[#151f28]/35" />
+      <Icon className="mt-1 h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
       <span className="sr-only">{label}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex min-w-0 flex-wrap items-center gap-1">
@@ -540,7 +540,7 @@ function ChipInput({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.82 }}
               transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-              className="inline-flex max-w-full origin-left items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-tight"
+              className="inline-flex max-w-full origin-left items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-semibold leading-tight"
               style={{ backgroundColor: tone.bg, color: tone.text }}
             >
               <span className="truncate">{value}</span>
@@ -574,7 +574,7 @@ function ChipInput({
           }}
           onBlur={() => commit(draft)}
           placeholder={values.length ? "Enter…" : placeholder}
-          className="nodrag nowheel min-w-[5rem] flex-1 bg-transparent text-[11px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
+          className="nodrag nowheel min-w-[5rem] flex-1 bg-transparent text-[13px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
         />
         </div>
       </div>
@@ -672,17 +672,19 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         <label className="flex min-w-0 items-center gap-1.5">
           <Clock className="h-3 w-3 shrink-0 text-[#151f28]/35" />
           <span className="sr-only">Duur in uren</span>
-          <input
-            type="number"
-            min={0}
-            step={0.5}
-            inputMode="decimal"
-            value={data.duration}
-            onChange={(e) => patchStep(id, { duration: e.target.value })}
-            placeholder="0"
-            className="nodrag nowheel w-14 bg-transparent text-[11px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
-          />
-          <span className="text-[11px] text-[#151f28]/45">uur</span>
+          <span className="flex items-baseline gap-0.5">
+            <input
+              type="number"
+              min={0}
+              step={0.5}
+              inputMode="decimal"
+              value={data.duration}
+              onChange={(e) => patchStep(id, { duration: e.target.value })}
+              placeholder="0"
+              className="nodrag nowheel w-8 bg-transparent text-right text-[11px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <span className="text-[11px] text-[#151f28]/45">uur</span>
+          </span>
         </label>
         <ChipInput
           icon={Users}

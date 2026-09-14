@@ -21,8 +21,7 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
   if (!process.env[k]) process.env[k] = v;
 }
 
-const SESSION_ID = "sophista-workshop";
-const KEY = `workshop:${SESSION_ID}`;
+const SESSION_IDS = ["sophista-dinsdag", "sophista-workshop"];
 const TTL = 60 * 60 * 24 * 90;
 const now = new Date().toISOString();
 
@@ -55,35 +54,10 @@ async function redis(...args) {
   return data.result;
 }
 
-const existingRaw = await redis("GET", KEY);
-let existing = null;
-if (typeof existingRaw === "string") {
-  try {
-    existing = JSON.parse(existingRaw);
-  } catch {
-    existing = null;
-  }
-}
-
-// Never clobber the live Vercel flowchart unless explicitly requested.
+// Never clobber a live flowchart unless explicitly requested.
 const resetSketch = process.argv.includes("--reset-sketch");
-const keepSketch = !resetSketch && Boolean(existing?.sketch);
 
 const attendees = [
-  {
-    id: "a1",
-    name: "Kevin Roos van Raadshooven",
-    org: "BlaBlaBuild",
-    photo: "/workshop/attendees/kevin-roos.png",
-    joinedAt: now,
-  },
-  {
-    id: "a2",
-    name: "Xennith Oosterveer",
-    org: "BlaBlaBuild",
-    photo: "/workshop/attendees/xennith-oosterveer.webp",
-    joinedAt: now,
-  },
   {
     id: "a3",
     name: "André Scheirlinck",
@@ -104,6 +78,20 @@ const attendees = [
     org: "Sophista",
     role: "IT manager",
     photo: "/workshop/attendees/joost-van-den-bos.jpg",
+    joinedAt: now,
+  },
+  {
+    id: "a1",
+    name: "Kevin Roos van Raadshooven",
+    org: "BlaBlaBuild",
+    photo: "/workshop/attendees/kevin-roos.png",
+    joinedAt: now,
+  },
+  {
+    id: "a2",
+    name: "Xennith Oosterveer",
+    org: "BlaBlaBuild",
+    photo: "/workshop/attendees/xennith-oosterveer.webp",
     joinedAt: now,
   },
 ];
@@ -132,7 +120,21 @@ const defaultIntro = {
   attendees,
 };
 
-const session = {
+async function seedOne(sessionId) {
+  const key = `workshop:${sessionId}`;
+  const existingRaw = await redis("GET", key);
+  let existing = null;
+  if (typeof existingRaw === "string") {
+    try {
+      existing = JSON.parse(existingRaw);
+    } catch {
+      existing = null;
+    }
+  }
+
+  const keepSketch = !resetSketch && Boolean(existing?.sketch);
+
+  const session = {
   meta: {
     title: "Sophista × blablabuild",
     company: "Sophista",
@@ -253,15 +255,19 @@ const session = {
   columns: existing?.columns,
 };
 
-await redis("SET", KEY, JSON.stringify(session));
-await redis("EXPIRE", KEY, String(TTL));
+  await redis("SET", key, JSON.stringify(session));
+  await redis("EXPIRE", key, String(TTL));
+
+  console.log(
+    keepSketch
+      ? `${sessionId}: kept schets (${existing.sketch?.type || "unknown"}), rev ${session.rev}`
+      : `${sessionId}: reset schets, rev ${session.rev}`
+  );
+}
 
 const names = attendees.map((a) => (a.role ? `${a.name} · ${a.role}` : a.name)).join(", ");
-console.log(
-  keepSketch
-    ? `Kept existing schets (${existing.sketch?.type || "unknown"})`
-    : "Reset schets → empty Voorbereidingsfase milestones"
-);
 console.log(`Attendees: ${names}`);
-console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
-console.log("Local: http://localhost:3000/tools/workshop?s=sophista-workshop");
+for (const id of SESSION_IDS) {
+  await seedOne(id);
+  console.log(`Local: http://localhost:3000/tools/workshop?s=${id}`);
+}
