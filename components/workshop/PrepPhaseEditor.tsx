@@ -1930,7 +1930,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
   useEffect(() => {
     if (!showSketchTips) return;
     function onPointerDown(event: PointerEvent) {
-      if (tipsRef.current?.contains(event.target as Node)) return;
+      if (tipsRef.current?.contains(event.target as globalThis.Node)) return;
       setShowSketchTips(false);
     }
     function onKeyDown(event: KeyboardEvent) {
