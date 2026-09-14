@@ -1,6 +1,7 @@
 # Sophista — source docs
 
-Prep pack for the Process Workshop session `sophista-workshop`.
+Prep pack for the Process Workshop session `sophista-dinsdag`
+(`sophista-workshop` is an alias of the same board).
 The live board compresses these into facilitation naslag; it does not dump them onto the kanban.
 
 | File | What it is | Used for |
@@ -9,4 +10,4 @@ The live board compresses these into facilitation naslag; it does not dump them 
 | [AI_toepassingen.pdf](./AI_toepassingen.pdf) | Six AI use cases on the sell-side prep phase | `SOPHISTA_AI_DIRECTIONS` + Richtingen tab |
 | [Prompt_IM.pdf](./Prompt_IM.pdf) | Concept IM generator prompt (slide structure, tone, branding, buyer questions) | `SOPHISTA_IM_STRUCTURE` |
 
-Workshop URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop
+Workshop URL: https://tools.blablabuild.com/tools/workshop?s=sophista-dinsdag

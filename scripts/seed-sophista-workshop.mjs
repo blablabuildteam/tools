@@ -21,7 +21,7 @@ for (const line of readFileSync(envPath, "utf8").split("\n")) {
   if (!process.env[k]) process.env[k] = v;
 }
 
-const SESSION_IDS = ["sophista-dinsdag", "sophista-workshop"];
+const SESSION_IDS = ["sophista-dinsdag"];
 const TTL = 60 * 60 * 24 * 90;
 const now = new Date().toISOString();
 

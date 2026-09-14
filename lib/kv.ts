@@ -4,6 +4,11 @@ export const KV_READY = Boolean(
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
 );
 
+/** Live Sophista board — older links used `sophista-workshop`. */
+const SESSION_ALIASES: Record<string, string> = {
+  "sophista-workshop": "sophista-dinsdag",
+};
+
 export async function redisCommand(...args: string[]): Promise<unknown> {
   const res = await fetch(process.env.KV_REST_API_URL!, {
     method: "POST",
@@ -19,5 +24,6 @@ export async function redisCommand(...args: string[]): Promise<unknown> {
 }
 
 export function normalizeSessionId(id: string): string {
-  return id.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  const n = id.toLowerCase().replace(/[^a-z0-9-]/g, "-");
+  return SESSION_ALIASES[n] ?? n;
 }

@@ -8,6 +8,7 @@ import {
   isSketchPatchKey,
   normalizeColumns,
   publicMeta,
+  sketchKeysPresent,
   type SketchPatchKey,
   type WorkshopCard,
   type WorkshopColumn,
@@ -345,15 +346,13 @@ export async function PUT(
     }
 
     if (body.action === "save-sketch") {
+      const incomingKeys = sketchKeysPresent(body.sketch);
       const touched = Array.isArray(body.touched)
         ? body.touched.filter(isSketchPatchKey)
-        : [];
+        : incomingKeys;
+      const keys = touched.length > 0 ? touched : incomingKeys;
       session = await mutateSession(params.sessionId, (next) => {
-        if (touched.length > 0) {
-          next.sketch = applySketchPatch(next.sketch, body.sketch, touched);
-        } else {
-          next.sketch = body.sketch;
-        }
+        next.sketch = applySketchPatch(next.sketch, body.sketch, keys);
       });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }

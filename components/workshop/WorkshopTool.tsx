@@ -87,6 +87,7 @@ export default function WorkshopTool() {
   const summaryDirty = useRef(false);
   const columnsDirty = useRef(false);
   const tabRef = useRef<Tab>("intro");
+  const boardRef = useRef<HTMLDivElement>(null);
   const revRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -134,7 +135,10 @@ export default function WorkshopTool() {
 
       const skipBoard = Boolean(
         opts?.poll &&
-          (columnsDirty.current || (tabRef.current === "board" && isEditingTextField()))
+          (columnsDirty.current ||
+            (tabRef.current === "board" &&
+              Boolean(boardRef.current?.contains(document.activeElement)) &&
+              isEditingTextField()))
       );
       const skipSummary = Boolean(
         opts?.poll && (summaryDirty.current || (tabRef.current === "wrap" && isEditingTextField()))
@@ -667,6 +671,7 @@ export default function WorkshopTool() {
         </ViewEnter>
 
         <ViewEnter active={tab === "board"} className="h-full overflow-x-auto">
+          <div ref={boardRef} className="h-full">
           <div data-view-item className="border-b border-white/8 px-5 py-3 sm:px-6">
             <p className="text-sm font-semibold text-white">Notities naast de schets</p>
             <p className="text-[12px] text-white/40">
@@ -684,6 +689,7 @@ export default function WorkshopTool() {
             onChangeColumn={onChangeColumn}
             onAddColumn={addColumn}
           />
+          </div>
         </ViewEnter>
 
         <ViewEnter active={tab === "reference"} className="h-full overflow-y-auto">

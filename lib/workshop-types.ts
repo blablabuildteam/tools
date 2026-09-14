@@ -445,6 +445,12 @@ export function isSketchPatchKey(value: unknown): value is SketchPatchKey {
   return typeof value === "string" && (SKETCH_PATCH_KEYS as readonly string[]).includes(value);
 }
 
+export function sketchKeysPresent(raw: unknown): SketchPatchKey[] {
+  if (!raw || typeof raw !== "object") return [];
+  const obj = raw as Record<string, unknown>;
+  return SKETCH_PATCH_KEYS.filter((key) => Object.prototype.hasOwnProperty.call(obj, key));
+}
+
 export function sketchFingerprint(doc: PrepPhaseSketch): string {
   return JSON.stringify({
     steps: doc.steps,

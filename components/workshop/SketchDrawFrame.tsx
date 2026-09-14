@@ -80,11 +80,19 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
         const next = normalizePrepPhase(data.sketch) ?? createEmptyPrepPhase();
         fingerprintRef.current = sketchFingerprint(next);
         setDoc(next);
-        if (!isPrepPhaseSketch(data.sketch) || !hadAiField || !hadMilestones || !hadStickies) {
+        const touched: SketchPatchKey[] = [];
+        if (!isPrepPhaseSketch(data.sketch)) {
+          touched.push(...["steps", "connections", "aiIdeas", "milestones", "stickies"] as SketchPatchKey[]);
+        } else {
+          if (!hadAiField) touched.push("aiIdeas");
+          if (!hadMilestones) touched.push("milestones");
+          if (!hadStickies) touched.push("stickies");
+        }
+        if (touched.length) {
           void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "save-sketch", sketch: next }),
+            body: JSON.stringify({ action: "save-sketch", sketch: next, touched }),
           }).then(async (res) => {
             rememberWrite((await res.json()) as WorkshopClientPayload);
           });
