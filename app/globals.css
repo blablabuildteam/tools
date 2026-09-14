@@ -125,8 +125,7 @@ body {
   transform: scale(0.96);
 }
 
-.prep-flow .react-flow__node-prep-step .react-flow__handle,
-.prep-flow .react-flow__node-prep-step .step-trash {
+.prep-flow .react-flow__node-prep-step .react-flow__handle {
   opacity: 0;
   pointer-events: none;
   transition: opacity 140ms ease;
@@ -134,11 +133,27 @@ body {
 
 .prep-flow .react-flow__node-prep-step:hover .react-flow__handle,
 .prep-flow .react-flow__node-prep-step.dragging .react-flow__handle,
-.prep-flow.is-connecting .react-flow__node-prep-step .react-flow__handle,
+.prep-flow.is-connecting .react-flow__node-prep-step .react-flow__handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.prep-flow .react-flow__node-prep-step .step-trash,
+.prep-flow .react-flow__node-prep-step .step-pain:not(.is-pain) {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
 .prep-flow .react-flow__node-prep-step:hover .step-trash,
 .prep-flow .react-flow__node-prep-step.selected .step-trash,
 .prep-flow .react-flow__node-prep-step.dragging .step-trash,
-.prep-flow .react-flow__node-prep-step .step-trash:focus-visible {
+.prep-flow .react-flow__node-prep-step .step-trash:focus-visible,
+.prep-flow .react-flow__node-prep-step:hover .step-pain,
+.prep-flow .react-flow__node-prep-step.selected .step-pain,
+.prep-flow .react-flow__node-prep-step.dragging .step-pain,
+.prep-flow .react-flow__node-prep-step .step-pain:focus-visible,
+.prep-flow .react-flow__node-prep-step .step-pain.is-pain {
   opacity: 1;
   pointer-events: auto;
 }

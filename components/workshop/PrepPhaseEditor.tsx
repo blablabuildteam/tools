@@ -638,9 +638,9 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
             e.stopPropagation();
             patchStep(id, { painPoint: !isPain });
           }}
-          className={`nodrag rounded p-0.5 ${
+          className={`step-pain nodrag rounded p-0.5 ${
             isPain
-              ? "text-rose-600 hover:text-rose-700"
+              ? "is-pain text-rose-600 hover:text-rose-700"
               : "text-[#151f28]/25 hover:text-[#151f28]/70"
           }`}
         >
