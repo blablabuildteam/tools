@@ -380,7 +380,12 @@ function MilestoneBlock({
                     <p className="mt-0.5 text-[12px] leading-snug text-white/45">{step.description}</p>
                   ) : null}
                   <p className="mt-1 text-[11px] text-white/35">
-                    {[hours, who.length ? who.join(" · ") : null, step.tools.length ? step.tools.join(" · ") : null]
+                    {[
+                      hours,
+                      who.length ? who.join(" · ") : null,
+                      step.tools.length ? step.tools.join(" · ") : null,
+                      step.formats?.length ? step.formats.join(" · ") : null,
+                    ]
                       .filter(Boolean)
                       .join("  ·  ")}
                   </p>

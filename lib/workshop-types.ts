@@ -392,6 +392,8 @@ export type PrepStep = {
   /** External parties. */
   parties: string[];
   tools: string[];
+  /** Output format, e.g. Excel, PDF. */
+  formats: string[];
   /** Marked as a friction / pain point in the process. */
   painPoint: boolean;
   order: number;
@@ -526,6 +528,7 @@ export function normalizePrepStep(step: PrepStep & {
     people,
     parties,
     tools: asChipList(step.tools),
+    formats: asChipList((step as PrepStep & { formats?: unknown }).formats),
     painPoint: step.painPoint === true,
     order: typeof step.order === "number" ? step.order : 0,
   };

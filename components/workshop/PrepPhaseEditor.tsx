@@ -4,7 +4,6 @@ import {
   addEdge,
   Background,
   BaseEdge,
-  Controls,
   Handle,
   MiniMap,
   Position,
@@ -22,10 +21,10 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { AnimatePresence, motion } from "framer-motion";
-import { Building2, Clock, FaceExpressionless, GripVertical, Plus, Sparkles, StickyNote, Trash2, Users, Wrench } from "lucide-react";
+import { animate, AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Building2, Clock, FaceExpressionless, FileType, GripVertical, Minus, Plus, Scan, Sparkles, StickyNote, Trash2, Users, Wrench } from "lucide-react";
 import { nanoid } from "nanoid";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   asChipList,
   createDefaultPrepMilestones,
@@ -45,7 +44,9 @@ import {
 const COL_W = 280;
 const COL_GAP = 40;
 const ORIGIN_X = 36;
-const ORIGIN_Y = 28;
+const HOURS_BAND_Y = 24;
+const HOURS_BAND_H = 116;
+const ORIGIN_Y = HOURS_BAND_Y + HOURS_BAND_H + 16;
 const HEADER_H = 168;
 const STEP_W = 252;
 const STEP_H = 236;
@@ -59,22 +60,22 @@ const REVEAL_H = 52;
 const STICKY_W = 176;
 
 const LANE_COLORS = [
-  "rgba(206, 255, 0, 0.16)",
-  "rgba(56, 189, 248, 0.16)",
-  "rgba(167, 139, 250, 0.16)",
-  "rgba(251, 191, 36, 0.16)",
-  "rgba(52, 211, 153, 0.16)",
-  "rgba(251, 146, 60, 0.16)",
-  "rgba(244, 114, 182, 0.16)",
-  "rgba(34, 211, 238, 0.16)",
-  "rgba(163, 230, 53, 0.16)",
-  "rgba(251, 113, 133, 0.18)",
-  "rgba(129, 140, 248, 0.18)",
-  "rgba(45, 212, 191, 0.18)",
-  "rgba(232, 121, 249, 0.18)",
-  "rgba(250, 204, 21, 0.18)",
-  "rgba(125, 211, 252, 0.18)",
-  "rgba(253, 186, 116, 0.18)",
+  "rgba(206, 255, 0, 0.09)",
+  "rgba(56, 189, 248, 0.09)",
+  "rgba(167, 139, 250, 0.09)",
+  "rgba(251, 191, 36, 0.09)",
+  "rgba(52, 211, 153, 0.09)",
+  "rgba(251, 146, 60, 0.09)",
+  "rgba(244, 114, 182, 0.09)",
+  "rgba(34, 211, 238, 0.09)",
+  "rgba(163, 230, 53, 0.09)",
+  "rgba(251, 113, 133, 0.1)",
+  "rgba(129, 140, 248, 0.1)",
+  "rgba(45, 212, 191, 0.1)",
+  "rgba(232, 121, 249, 0.1)",
+  "rgba(250, 204, 21, 0.1)",
+  "rgba(125, 211, 252, 0.1)",
+  "rgba(253, 186, 116, 0.1)",
 ];
 
 function laneBackground(index: number) {
@@ -84,9 +85,10 @@ function laneBackground(index: number) {
 
 type LaneData = { index: number };
 type MilestoneData = PrepMilestone & { index: number };
+type HoursBandData = { milestoneIds: string[] };
 type AddData = { milestoneId: PrepMilestoneId };
 type RevealData = { milestoneId: PrepMilestoneId; open: boolean; count: number };
-type ChipKind = "person" | "party" | "tool";
+type ChipKind = "person" | "party" | "tool" | "format";
 
 type EditorCtx = {
   patchStep: (id: string, partial: Partial<PrepStep>) => void;
@@ -104,9 +106,11 @@ type EditorCtx = {
   chipSuggestions: Record<ChipKind, string[]>;
   hoursByMilestone: Record<PrepMilestoneId, number>;
   aiCountByMilestone: Record<PrepMilestoneId, number>;
+  painCountByMilestone: Record<PrepMilestoneId, number>;
   peopleByMilestone: Record<PrepMilestoneId, string[]>;
   partiesByMilestone: Record<PrepMilestoneId, string[]>;
   toolsByMilestone: Record<PrepMilestoneId, string[]>;
+  formatsByMilestone: Record<PrepMilestoneId, string[]>;
   showAiKansen: boolean;
   revealedAiMilestoneIds: string[];
   toggleAiColumn: (milestoneId: PrepMilestoneId) => void;
@@ -129,6 +133,88 @@ function formatHours(n: number): string {
   if (n <= 0) return "0 uur";
   const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
   return `${label} uur`;
+}
+
+function formatHoursCompact(n: number): string {
+  if (n <= 0) return "0";
+  const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
+  return `${label}u`;
+}
+
+function hoursBandWidth(count: number) {
+  if (count <= 0) return COL_W;
+  return count * COL_W + (count - 1) * COL_GAP;
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function useAnimatedHours(ids: string[], hoursById: Record<string, number>): number[] {
+  const target = ids.map((id) => hoursById[id] ?? 0);
+  const targetKey = ids.map((id, i) => `${id}:${target[i]}`).join("|");
+  const [shown, setShown] = useState(target);
+  const shownRef = useRef(target);
+  const idsRef = useRef(ids);
+  const targetRef = useRef({ ids, target });
+  const reduceMotion = useReducedMotion();
+  const first = useRef(true);
+  targetRef.current = { ids, target };
+
+  useEffect(() => {
+    const { ids: nextIds, target: nextVals } = targetRef.current;
+    const sameShape =
+      idsRef.current.length === nextIds.length && idsRef.current.every((id, i) => id === nextIds[i]);
+    idsRef.current = nextIds;
+
+    if (first.current || reduceMotion || !sameShape) {
+      first.current = false;
+      shownRef.current = nextVals;
+      setShown(nextVals);
+      return;
+    }
+
+    const from = shownRef.current;
+    if (from.length === nextVals.length && from.every((v, i) => v === nextVals[i])) return;
+
+    const controls = animate(0, 1, {
+      duration: 0.52,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (t) => {
+        const mixed = nextVals.map((b, i) => Math.max(0, (from[i] ?? 0) + (b - (from[i] ?? 0)) * t));
+        shownRef.current = mixed;
+        setShown(mixed);
+      },
+      onComplete: () => {
+        shownRef.current = nextVals;
+        setShown(nextVals);
+      },
+    });
+    return () => controls.stop();
+  }, [reduceMotion, targetKey]);
+
+  return shown.length === ids.length ? shown : target;
+}
+
+function hoursLinePath(points: { x: number; y: number }[], yMin: number, yMax: number): string {
+  if (!points.length) return "";
+  if (points.length === 1) {
+    const p = points[0];
+    return `M ${p.x - 36} ${p.y} L ${p.x + 36} ${p.y}`;
+  }
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const c1x = p1.x + (p2.x - p0.x) / 6;
+    const c1y = clamp(p1.y + (p2.y - p0.y) / 6, yMin, yMax);
+    const c2x = p2.x - (p3.x - p1.x) / 6;
+    const c2y = clamp(p2.y - (p3.y - p1.y) / 6, yMin, yMax);
+    d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
 }
 
 function uniqueChipList(steps: PrepStep[], pick: (step: PrepStep) => string[]): string[] {
@@ -244,7 +330,6 @@ function layoutNodes(
       draggable: false,
       selectable: true,
       connectable: false,
-      className: "nopan",
       style: { zIndex: 4, width: STEP_W, height: ADD_H },
     });
     y += ADD_H + 8;
@@ -257,7 +342,6 @@ function layoutNodes(
       draggable: false,
       selectable: true,
       connectable: false,
-      className: "nopan",
       style: { zIndex: 4, width: STEP_W, height: REVEAL_H },
     });
     y += REVEAL_H + (aiOpen ? 8 : LANE_PAD);
@@ -298,7 +382,15 @@ function layoutNodes(
       connectable: false,
       focusable: false,
       className: "nopan",
-      style: { width: COL_W, height, zIndex: 0, pointerEvents: "none" },
+      width: COL_W,
+      height,
+      style: {
+        width: COL_W,
+        height,
+        zIndex: 0,
+        pointerEvents: "none",
+        borderRadius: 16,
+      },
     });
     nodes.push({
       id: `ms-${m.id}`,
@@ -311,6 +403,28 @@ function layoutNodes(
     });
     nodes.push(...columnNodes);
   });
+  if (cols.length > 0) {
+    const bandW = hoursBandWidth(cols.length);
+    nodes.push({
+      id: "hours-band",
+      type: "hours-band",
+      position: { x: ORIGIN_X, y: HOURS_BAND_Y },
+      data: { milestoneIds: cols.map((m) => m.id) },
+      draggable: false,
+      selectable: false,
+      connectable: false,
+      focusable: false,
+      className: "nopan",
+      width: bandW,
+      height: HOURS_BAND_H,
+      style: {
+        width: bandW,
+        height: HOURS_BAND_H,
+        zIndex: 6,
+        pointerEvents: "none",
+      },
+    });
+  }
   nodes.push({
     id: "add-milestone",
     type: "add-milestone",
@@ -338,9 +452,141 @@ function layoutNodes(
 function LaneNode({ data }: NodeProps<Node<LaneData>>) {
   return (
     <div
-      className="pointer-events-none h-full w-full rounded-2xl ring-1 ring-black/8"
+      className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-black/8"
       style={{ backgroundColor: laneBackground(data.index) }}
     />
+  );
+}
+
+function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
+  const { hoursByMilestone } = useEditor();
+  const gid = useId().replace(/:/g, "");
+  const ids = data.milestoneIds;
+  const hours = useAnimatedHours(ids, hoursByMilestone);
+  const total = hours.reduce((sum, n) => sum + n, 0);
+  const peak = Math.max(...hours, 0);
+  const width = hoursBandWidth(ids.length);
+  const padTop = 40;
+  const padBottom = 22;
+  const plotTop = padTop;
+  const plotBottom = HOURS_BAND_H - padBottom;
+  const plotH = Math.max(8, plotBottom - plotTop);
+  const yMax = peak > 0 ? peak : 1;
+  const points = hours.map((h, i) => ({
+    x: i * (COL_W + COL_GAP) + COL_W / 2,
+    y: plotBottom - (h / yMax) * plotH,
+    hours: h,
+  }));
+  const line = hoursLinePath(points, plotTop, plotBottom);
+  const area =
+    points.length === 0
+      ? ""
+      : points.length === 1
+        ? `${line} L ${points[0].x + 36} ${plotBottom} L ${points[0].x - 36} ${plotBottom} Z`
+        : `${line} L ${points[points.length - 1].x} ${plotBottom} L ${points[0].x} ${plotBottom} Z`;
+
+  return (
+    <div
+      className="pointer-events-none relative overflow-hidden rounded-2xl bg-[#151f28] shadow-sm ring-1 ring-black/10"
+      style={{ width, height: HOURS_BAND_H }}
+      aria-label={`Uren per milestone, ${formatHours(total)} totaal`}
+    >
+      <div className="absolute inset-x-3 top-2 z-10 flex items-center justify-between gap-3">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ceff00]/80">
+          Uren over het proces
+        </p>
+        <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[11px] font-semibold text-[#151f28]">
+          {formatHours(total)} totaal
+        </p>
+      </div>
+      <AnimatePresence>
+        {total < 0.05 ? (
+          <motion.p
+            key="hours-empty"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="absolute inset-x-0 top-[52px] text-center text-[11px] text-white/35"
+          >
+            Vul uren in bij de stappen om te zien waar de inzet zit
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
+      {ids.length === 0 ? null : (
+        <svg
+          width={width}
+          height={HOURS_BAND_H}
+          viewBox={`0 0 ${width} ${HOURS_BAND_H}`}
+          className="absolute inset-0"
+          aria-hidden
+        >
+          <defs>
+            <linearGradient id={`hours-fill-${gid}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ceff00" stopOpacity="0.55" />
+              <stop offset="100%" stopColor="#ceff00" stopOpacity="0.04" />
+            </linearGradient>
+          </defs>
+          <line
+            x1={points[0]?.x ?? 0}
+            x2={points[points.length - 1]?.x ?? width}
+            y1={plotBottom}
+            y2={plotBottom}
+            stroke="white"
+            strokeOpacity="0.12"
+            strokeWidth="1"
+          />
+          {area ? <path d={area} fill={`url(#hours-fill-${gid})`} /> : null}
+          {line ? (
+            <path
+              d={line}
+              fill="none"
+              stroke="#ceff00"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : null}
+          {points.map((p, i) => {
+            const isPeak = peak > 0 && p.hours === peak;
+            return (
+              <g key={ids[i]}>
+                <line
+                  x1={p.x}
+                  y1={p.y}
+                  x2={p.x}
+                  y2={plotBottom}
+                  stroke="#ceff00"
+                  strokeOpacity="0.2"
+                  strokeWidth="1"
+                />
+                <motion.circle
+                  cx={p.x}
+                  cy={p.y}
+                  initial={false}
+                  animate={{ r: isPeak ? 5 : 3.5 }}
+                  transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  fill={isPeak ? "#ceff00" : "#151f28"}
+                  stroke="#ceff00"
+                  strokeWidth="2"
+                />
+                <text
+                  x={p.x}
+                  y={HOURS_BAND_H - 6}
+                  textAnchor="middle"
+                  fill={p.hours > 0 ? (isPeak ? "#ceff00" : "rgba(255,255,255,0.7)") : "rgba(255,255,255,0.28)"}
+                  fontSize="10"
+                  fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+                  fontWeight="600"
+                >
+                  {formatHoursCompact(p.hours)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      )}
+    </div>
   );
 }
 
@@ -377,8 +623,28 @@ const PARTY_PALETTE = [
   { bg: "#d97706", text: "#ffffff" },
 ];
 
+const FORMAT_PALETTE = [
+  { bg: "#334155", text: "#f8fafc" },
+  { bg: "#0f766e", text: "#ffffff" },
+  { bg: "#1d4ed8", text: "#ffffff" },
+  { bg: "#9f1239", text: "#fff1f2" },
+  { bg: "#365314", text: "#ecfccb" },
+  { bg: "#57534e", text: "#fafaf9" },
+  { bg: "#6d28d9", text: "#f5f3ff" },
+  { bg: "#0c4a6e", text: "#e0f2fe" },
+];
+
+const FORMAT_PRESETS = ["Excel", "PDF", "Word", "PowerPoint", "Email", "Dashboard"];
+
 function chipColor(label: string, kind: ChipKind) {
-  const palette = kind === "person" ? PERSON_PALETTE : kind === "party" ? PARTY_PALETTE : TOOL_PALETTE;
+  const palette =
+    kind === "person"
+      ? PERSON_PALETTE
+      : kind === "party"
+        ? PARTY_PALETTE
+        : kind === "format"
+          ? FORMAT_PALETTE
+          : TOOL_PALETTE;
   const key = label.trim().toLowerCase();
   let hash = 0;
   for (let i = 0; i < key.length; i += 1) hash = (hash * 33 + key.charCodeAt(i)) >>> 0;
@@ -394,9 +660,11 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
   const {
     hoursByMilestone,
     aiCountByMilestone,
+    painCountByMilestone,
     peopleByMilestone,
     partiesByMilestone,
     toolsByMilestone,
+    formatsByMilestone,
     patchMilestone,
     showAiKansen,
     revealedAiMilestoneIds,
@@ -404,9 +672,11 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
   const boxRef = useReportHeight(id);
   const hours = hoursByMilestone[data.id] ?? 0;
   const aiCount = aiCountByMilestone[data.id] ?? 0;
+  const painCount = painCountByMilestone[data.id] ?? 0;
   const people = peopleByMilestone[data.id] ?? [];
   const parties = partiesByMilestone[data.id] ?? [];
   const tools = toolsByMilestone[data.id] ?? [];
+  const formats = formatsByMilestone[data.id] ?? [];
   const n = data.index + 1;
   const aiOpen = isAiOpen(data.id, showAiKansen, revealedAiMilestoneIds);
 
@@ -436,6 +706,15 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
               {aiCount} AI
             </p>
           )}
+          {painCount > 0 && (
+            <p
+              className="inline-flex items-center gap-0.5 rounded-full bg-rose-500/20 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-rose-300"
+              title={`${painCount} pijnpunt${painCount === 1 ? "" : "en"}`}
+            >
+              <FaceExpressionless className="h-3.5 w-3.5" />
+              {painCount}
+            </p>
+          )}
           <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[12px] font-semibold text-[#151f28]">
             {formatHours(hours)}
           </p>
@@ -445,20 +724,21 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
         value={data.short}
         onChange={(e) => patchMilestone(data.id, { short: e.target.value })}
         placeholder="Naam milestone"
-        className="nodrag nowheel mt-1.5 w-full bg-transparent text-[15px] font-semibold leading-tight tracking-tight text-white outline-none placeholder:text-white/30"
+        className="nodrag mt-1.5 w-full bg-transparent text-[15px] font-semibold leading-tight tracking-tight text-white outline-none placeholder:text-white/30"
       />
       <textarea
         value={data.title}
         onChange={(e) => patchMilestone(data.id, { title: e.target.value })}
         placeholder="Beschrijving"
         rows={2}
-        className="nodrag nowheel mt-1 w-full resize-none bg-transparent text-[13px] leading-snug text-white/55 outline-none placeholder:text-white/30"
+        className="nodrag mt-1 w-full resize-none bg-transparent text-[13px] leading-snug text-white/55 outline-none placeholder:text-white/30"
       />
-      {(people.length > 0 || parties.length > 0 || tools.length > 0) && (
+      {(people.length > 0 || parties.length > 0 || tools.length > 0 || formats.length > 0) && (
         <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">
           <RollupChips icon={Users} values={people} kind="person" />
           <RollupChips icon={Building2} values={parties} kind="party" />
           <RollupChips icon={Wrench} values={tools} kind="tool" />
+          <RollupChips icon={FileType} values={formats} kind="format" />
         </div>
       )}
     </div>
@@ -641,7 +921,7 @@ function ChipInput({
               }, 80);
             }}
             placeholder={values.length ? "…" : placeholder}
-            className="nodrag nowheel w-full bg-transparent text-[13px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
+            className="nodrag w-full bg-transparent text-[13px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
           />
           {open && matches.length > 0 && (
             <ul className="nodrag nopan nowheel absolute left-0 top-full z-50 mt-1 min-w-full overflow-hidden rounded-lg border border-black/10 bg-white py-0.5 shadow-lg">
@@ -763,7 +1043,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         onChange={(e) => patchStep(id, { description: e.target.value })}
         placeholder="Beschrijving — wat gebeurt hier?"
         rows={3}
-        className="nodrag nowheel mt-1.5 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
+        className="nodrag mt-1.5 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
       />
 
       <div className="mt-2 space-y-1.5 border-t border-black/6 pt-2">
@@ -779,7 +1059,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
               value={data.duration}
               onChange={(e) => patchStep(id, { duration: e.target.value })}
               placeholder="0"
-              className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="nodrag bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
             />
             <span className="text-[13px] text-[#151f28]/45">uur</span>
@@ -808,6 +1088,14 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
           values={asChipList(data.tools)}
           kind="tool"
           onChange={(tools) => patchStep(id, { tools })}
+        />
+        <ChipInput
+          icon={FileType}
+          label="Formaat"
+          placeholder="Formaat"
+          values={asChipList(data.formats)}
+          kind="format"
+          onChange={(formats) => patchStep(id, { formats })}
         />
       </div>
     </div>
@@ -902,13 +1190,13 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
         onChange={(e) => patchAi(id, { body: e.target.value })}
         placeholder="Wat kan AI hier doen?"
         rows={3}
-        className="nodrag nowheel mt-1.5 w-full resize-none bg-transparent text-[11px] leading-snug text-[#151f28]/80 outline-none placeholder:text-[#151f28]/35"
+        className="nodrag mt-1.5 w-full resize-none bg-transparent text-[11px] leading-snug text-[#151f28]/80 outline-none placeholder:text-[#151f28]/35"
       />
       <input
         value={data.sources}
         onChange={(e) => patchAi(id, { sources: e.target.value })}
         placeholder="Bronnen · bijv. Company.info"
-        className="nodrag nowheel mt-1 w-full bg-transparent font-mono text-[10px] text-[#151f28]/55 outline-none placeholder:text-[#151f28]/30"
+        className="nodrag mt-1 w-full bg-transparent font-mono text-[10px] text-[#151f28]/55 outline-none placeholder:text-[#151f28]/30"
       />
     </div>
     </div>
@@ -955,7 +1243,7 @@ function StickyNode({ id, data, selected }: NodeProps<Node<PrepSticky>>) {
             onChange={(e) => patchSticky(id, { text: e.target.value })}
             placeholder="Notitie…"
             rows={5}
-            className="nodrag nowheel min-h-[88px] w-full resize-none bg-transparent text-[12px] leading-snug text-[#151f28]/90 outline-none placeholder:text-[#151f28]/35"
+            className="nodrag min-h-[88px] w-full resize-none bg-transparent text-[12px] leading-snug text-[#151f28]/90 outline-none placeholder:text-[#151f28]/35"
           />
           <button
             type="button"
@@ -1054,6 +1342,7 @@ function SketchEdge({
 
 const nodeTypes = {
   lane: LaneNode,
+  "hours-band": HoursBandNode,
   milestone: MilestoneNode,
   "add-milestone": AddMilestoneNode,
   "prep-step": StepNode,
@@ -1244,7 +1533,10 @@ type Props = {
 };
 
 function FlowCanvas({ initial, remote, onSave }: Props) {
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
+  const fitToScreen = useCallback(() => {
+    fitView({ padding: 0.08, duration: 220 });
+  }, [fitView]);
   const [stepList, setStepList] = useState<PrepStep[]>(() => initial.steps.map(normalizePrepStep));
   const [aiList, setAiList] = useState<PrepAiIdea[]>(() => initial.aiIdeas ?? []);
   const [milestones, setMilestones] = useState<PrepMilestone[]>(
@@ -1567,6 +1859,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             people: [],
             parties: [],
             tools: [],
+            formats: [],
             painPoint: false,
             order,
           },
@@ -1737,14 +2030,24 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     [milestones, stepList]
   );
 
-  const chipSuggestions = useMemo<Record<ChipKind, string[]>>(
-    () => ({
+  const formatsByMilestone = useMemo(
+    () => uniqueChipsByMilestone(milestones, stepList, (s) => asChipList(s.formats)),
+    [milestones, stepList]
+  );
+
+  const chipSuggestions = useMemo<Record<ChipKind, string[]>>(() => {
+    const enteredFormats = uniqueChipList(stepList, (s) => asChipList(s.formats));
+    const haveFormat = new Set(enteredFormats.map((s) => s.toLowerCase()));
+    return {
       person: uniqueChipList(stepList, (s) => asChipList(s.people)),
       party: uniqueChipList(stepList, (s) => asChipList(s.parties)),
       tool: uniqueChipList(stepList, (s) => asChipList(s.tools)),
-    }),
-    [stepList]
-  );
+      format: [
+        ...enteredFormats,
+        ...FORMAT_PRESETS.filter((p) => !haveFormat.has(p.toLowerCase())),
+      ],
+    };
+  }, [stepList]);
 
   const aiCountByMilestone = useMemo(() => {
     const totals = {} as Record<PrepMilestoneId, number>;
@@ -1754,6 +2057,15 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     }
     return totals;
   }, [aiList, milestones]);
+
+  const painCountByMilestone = useMemo(() => {
+    const totals = {} as Record<PrepMilestoneId, number>;
+    for (const m of milestones) totals[m.id] = 0;
+    for (const step of stepList) {
+      if (step.painPoint) totals[step.milestoneId] = (totals[step.milestoneId] ?? 0) + 1;
+    }
+    return totals;
+  }, [milestones, stepList]);
 
   const toggleAiColumn = useCallback(
     (milestoneId: PrepMilestoneId) => {
@@ -1787,9 +2099,11 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       addAi,
       hoursByMilestone,
       aiCountByMilestone,
+      painCountByMilestone,
       peopleByMilestone,
       partiesByMilestone,
       toolsByMilestone,
+      formatsByMilestone,
       showAiKansen,
       revealedAiMilestoneIds: revealedAiIds,
       toggleAiColumn,
@@ -1811,7 +2125,9 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       deleteConnection,
       deleteStep,
       deleteSticky,
+      formatsByMilestone,
       hoursByMilestone,
+      painCountByMilestone,
       patchAi,
       patchMilestone,
       patchStep,
@@ -2014,10 +2330,14 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           deleteKeyCode={["Backspace", "Delete"]}
           minZoom={0.28}
           maxZoom={1.35}
+          panOnScroll
+          panOnScrollMode="free"
+          panOnScrollSpeed={1}
+          zoomOnScroll={false}
+          zoomOnPinch
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} color="#d9d5cd" />
-          <Controls showInteractive={false} />
           <MiniMap
             pannable
             zoomable
@@ -2030,6 +2350,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
                 return "#1125ff";
               }
               if (n.type === "milestone") return "#151f28";
+              if (n.type === "hours-band") return "#151f28";
               if (n.type === "ai-idea") return "#ceff00";
               if (n.type === "sticky") return (n.data as PrepSticky).color || "#FDE047";
               return "#d6d3cd";
@@ -2047,7 +2368,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           </div>
           <button
             type="button"
-            onClick={() => fitView({ padding: 0.08, duration: 220 })}
+            onClick={fitToScreen}
             className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
           >
             Alle 9 tonen
@@ -2079,6 +2400,36 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           <p className="self-center rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[#151f28]/55 ring-1 ring-black/5">
             Dubbelklik op het bord voor een sticky · hover een lijn om te verwijderen
           </p>
+        </div>
+
+        <div className="pointer-events-none absolute bottom-3 left-3 z-20">
+          <div className="pointer-events-auto flex flex-col overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/10">
+            <button
+              type="button"
+              aria-label="Inzoomen"
+              onClick={() => zoomIn({ duration: 160 })}
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+            >
+              <Plus className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              aria-label="Uitzoomen"
+              onClick={() => zoomOut({ duration: 160 })}
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+            >
+              <Minus className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+            <div className="mx-2 h-px bg-black/10" />
+            <button
+              type="button"
+              aria-label="Passend in beeld"
+              onClick={fitToScreen}
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05]"
+            >
+              <Scan className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+          </div>
         </div>
       </div>
     </EditorContext.Provider>

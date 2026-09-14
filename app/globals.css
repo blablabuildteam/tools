@@ -158,12 +158,19 @@ body {
   pointer-events: auto;
 }
 
-.react-flow__node-sticky,
-.react-flow__node-lane {
+.react-flow__node-sticky {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
   box-shadow: none !important;
+}
+
+.react-flow__node-lane,
+.react-flow__node-hours-band {
+  border: none !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .react-flow__node-prep-step {
