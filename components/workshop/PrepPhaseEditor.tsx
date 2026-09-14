@@ -58,17 +58,29 @@ const ADD_AI_H = 36;
 const REVEAL_H = 52;
 const STICKY_W = 176;
 
-const LANE_TONES = [
-  "bg-[#ceff00]/12",
-  "bg-sky-400/10",
-  "bg-violet-400/10",
-  "bg-amber-400/10",
-  "bg-emerald-400/10",
-  "bg-orange-400/10",
-  "bg-pink-400/10",
-  "bg-cyan-400/10",
-  "bg-lime-400/10",
+const LANE_COLORS = [
+  "rgba(206, 255, 0, 0.16)",
+  "rgba(56, 189, 248, 0.16)",
+  "rgba(167, 139, 250, 0.16)",
+  "rgba(251, 191, 36, 0.16)",
+  "rgba(52, 211, 153, 0.16)",
+  "rgba(251, 146, 60, 0.16)",
+  "rgba(244, 114, 182, 0.16)",
+  "rgba(34, 211, 238, 0.16)",
+  "rgba(163, 230, 53, 0.16)",
+  "rgba(251, 113, 133, 0.18)",
+  "rgba(129, 140, 248, 0.18)",
+  "rgba(45, 212, 191, 0.18)",
+  "rgba(232, 121, 249, 0.18)",
+  "rgba(250, 204, 21, 0.18)",
+  "rgba(125, 211, 252, 0.18)",
+  "rgba(253, 186, 116, 0.18)",
 ];
+
+function laneBackground(index: number) {
+  const i = Number.isFinite(index) && index >= 0 ? index : 0;
+  return LANE_COLORS[i % LANE_COLORS.length];
+}
 
 type LaneData = { index: number };
 type MilestoneData = PrepMilestone & { index: number };
@@ -89,6 +101,7 @@ type EditorCtx = {
   patchSticky: (id: string, partial: Partial<PrepSticky>) => void;
   deleteSticky: (id: string) => void;
   deleteConnection: (id: string) => void;
+  chipSuggestions: Record<ChipKind, string[]>;
   hoursByMilestone: Record<PrepMilestoneId, number>;
   aiCountByMilestone: Record<PrepMilestoneId, number>;
   peopleByMilestone: Record<PrepMilestoneId, string[]>;
@@ -116,6 +129,17 @@ function formatHours(n: number): string {
   if (n <= 0) return "0 uur";
   const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
   return `${label} uur`;
+}
+
+function uniqueChipList(steps: PrepStep[], pick: (step: PrepStep) => string[]): string[] {
+  const map = new Map<string, string>();
+  for (const step of steps) {
+    for (const label of pick(step)) {
+      const key = label.trim().toLowerCase();
+      if (key && !map.has(key)) map.set(key, label.trim());
+    }
+  }
+  return [...map.values()];
 }
 
 function uniqueChipsByMilestone(
@@ -314,7 +338,8 @@ function layoutNodes(
 function LaneNode({ data }: NodeProps<Node<LaneData>>) {
   return (
     <div
-      className={`pointer-events-none h-full w-full rounded-2xl ring-1 ring-black/8 ${LANE_TONES[data.index % LANE_TONES.length] ?? "bg-white/40"}`}
+      className="pointer-events-none h-full w-full rounded-2xl ring-1 ring-black/8"
+      style={{ backgroundColor: laneBackground(data.index) }}
     />
   );
 }
@@ -401,17 +426,17 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
           >
             <GripVertical className="h-4 w-4" />
           </button>
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ceff00]">
+          <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-[#ceff00]">
             {String(n).padStart(2, "0")} · voorbereiding
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {aiOpen && aiCount > 0 && (
-            <p className="rounded-full bg-[#ceff00]/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-[#ceff00]">
+            <p className="rounded-full bg-[#ceff00]/15 px-2 py-0.5 font-mono text-[12px] font-semibold text-[#ceff00]">
               {aiCount} AI
             </p>
           )}
-          <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[10px] font-semibold text-[#151f28]">
+          <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[12px] font-semibold text-[#151f28]">
             {formatHours(hours)}
           </p>
         </div>
@@ -420,14 +445,14 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
         value={data.short}
         onChange={(e) => patchMilestone(data.id, { short: e.target.value })}
         placeholder="Naam milestone"
-        className="nodrag nowheel mt-1.5 w-full bg-transparent text-[14px] font-semibold leading-tight tracking-tight text-white outline-none placeholder:text-white/30"
+        className="nodrag nowheel mt-1.5 w-full bg-transparent text-[15px] font-semibold leading-tight tracking-tight text-white outline-none placeholder:text-white/30"
       />
       <textarea
         value={data.title}
         onChange={(e) => patchMilestone(data.id, { title: e.target.value })}
         placeholder="Beschrijving"
         rows={2}
-        className="nodrag nowheel mt-1 w-full resize-none bg-transparent text-[11px] leading-snug text-white/55 outline-none placeholder:text-white/30"
+        className="nodrag nowheel mt-1 w-full resize-none bg-transparent text-[13px] leading-snug text-white/55 outline-none placeholder:text-white/30"
       />
       {(people.length > 0 || parties.length > 0 || tools.length > 0) && (
         <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">
@@ -452,7 +477,7 @@ function RollupChips({
   if (!values.length) return null;
   return (
     <div className="flex min-w-0 items-start gap-1.5">
-      <Icon className="mt-0.5 h-3 w-3 shrink-0 text-white/40" />
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" />
       <div className="flex min-w-0 flex-wrap gap-1">
         <AnimatePresence initial={false} mode="popLayout">
           {values.map((value) => {
@@ -465,7 +490,7 @@ function RollupChips({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.82 }}
                 transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                className="inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-tight"
+                className="inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[12px] font-semibold leading-tight"
                 style={{ backgroundColor: tone.bg, color: tone.text }}
               >
                 {value}
@@ -482,7 +507,7 @@ function AddMilestoneNode() {
   return (
     <div className="nodrag nopan flex h-[118px] w-[260px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-white/80 px-3 text-center text-[#151f28]/65 transition-colors duration-200 hover:border-[#151f28]/45 hover:bg-white">
       <Plus className="h-5 w-5" />
-      <span className="text-[12px] font-semibold">Milestone toevoegen</span>
+      <span className="text-[13px] font-semibold">Milestone toevoegen</span>
     </div>
   );
 }
@@ -512,13 +537,32 @@ function ChipInput({
   kind: ChipKind;
   onChange: (next: string[]) => void;
 }) {
+  const { chipSuggestions } = useEditor();
   const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+
+  const matches = useMemo(() => {
+    const q = draft.trim().toLowerCase();
+    if (!q) return [];
+    const taken = new Set(values.map((v) => v.toLowerCase()));
+    return (chipSuggestions[kind] ?? [])
+      .filter((s) => !taken.has(s.toLowerCase()) && s.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aStarts = a.toLowerCase().startsWith(q) ? 0 : 1;
+        const bStarts = b.toLowerCase().startsWith(q) ? 0 : 1;
+        return aStarts - bStarts || a.localeCompare(b, "nl");
+      })
+      .slice(0, 6);
+  }, [chipSuggestions, draft, kind, values]);
 
   function commit(raw: string) {
     const nextLabel = raw.trim();
+    setDraft("");
+    setOpen(false);
+    setActive(0);
     if (!nextLabel) return;
     const exists = values.some((v) => v.toLowerCase() === nextLabel.toLowerCase());
-    setDraft("");
     if (exists) return;
     onChange([...values, nextLabel]);
   }
@@ -559,23 +603,77 @@ function ChipInput({
           );
         })}
         </AnimatePresence>
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === ",") {
-              e.preventDefault();
-              e.stopPropagation();
-              commit(draft);
-            } else if (e.key === "Backspace" && !draft && values.length) {
-              e.preventDefault();
-              onChange(values.slice(0, -1));
-            }
-          }}
-          onBlur={() => commit(draft)}
-          placeholder={values.length ? "Enter…" : placeholder}
-          className="nodrag nowheel min-w-[5rem] flex-1 bg-transparent text-[13px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
-        />
+        <div className="relative min-w-[5rem] flex-1">
+          <input
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setActive(0);
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={(e) => {
+              if (open && matches.length && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                e.preventDefault();
+                e.stopPropagation();
+                const delta = e.key === "ArrowDown" ? 1 : -1;
+                setActive((n) => (n + delta + matches.length) % matches.length);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setOpen(false);
+                return;
+              }
+              if (e.key === "Enter" || e.key === ",") {
+                e.preventDefault();
+                e.stopPropagation();
+                commit(open && matches[active] ? matches[active] : draft);
+              } else if (e.key === "Backspace" && !draft && values.length) {
+                e.preventDefault();
+                onChange(values.slice(0, -1));
+              }
+            }}
+            onBlur={() => {
+              window.setTimeout(() => {
+                setOpen(false);
+                commit(draft);
+              }, 80);
+            }}
+            placeholder={values.length ? "…" : placeholder}
+            className="nodrag nowheel w-full bg-transparent text-[13px] text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30"
+          />
+          {open && matches.length > 0 && (
+            <ul className="nodrag nopan nowheel absolute left-0 top-full z-50 mt-1 min-w-full overflow-hidden rounded-lg border border-black/10 bg-white py-0.5 shadow-lg">
+              {matches.map((match, i) => {
+                const tone = chipColor(match, kind);
+                return (
+                  <li key={match.toLowerCase()}>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center px-2 py-1 text-left text-[12px] font-semibold ${
+                        i === active ? "bg-[#151f28]/6" : "hover:bg-[#151f28]/4"
+                      }`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        commit(match);
+                      }}
+                      onMouseEnter={() => setActive(i)}
+                    >
+                      <span
+                        className="truncate rounded-full px-1.5 py-0.5"
+                        style={{ backgroundColor: tone.bg, color: tone.text }}
+                      >
+                        {match}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
         </div>
       </div>
     </div>
@@ -631,7 +729,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
           value={data.title}
           onChange={(e) => patchStep(id, { title: e.target.value })}
           placeholder="Titel van de stap"
-          className="nodrag min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-[#151f28] outline-none placeholder:text-[#151f28]/30"
+          className="nodrag min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-[#151f28] outline-none placeholder:text-[#151f28]/30"
         />
         <button
           type="button"
@@ -665,14 +763,14 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         onChange={(e) => patchStep(id, { description: e.target.value })}
         placeholder="Beschrijving — wat gebeurt hier?"
         rows={3}
-        className="nodrag nowheel mt-1.5 w-full resize-none bg-transparent text-[11px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
+        className="nodrag nowheel mt-1.5 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
       />
 
-      <div className="mt-2 space-y-1 border-t border-black/6 pt-2">
+      <div className="mt-2 space-y-1.5 border-t border-black/6 pt-2">
         <label className="flex min-w-0 items-center gap-1.5">
-          <Clock className="h-3 w-3 shrink-0 text-[#151f28]/35" />
+          <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
           <span className="sr-only">Duur in uren</span>
-          <span className="flex items-baseline gap-0.5">
+          <span className="flex items-baseline gap-1">
             <input
               type="number"
               min={0}
@@ -681,9 +779,10 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
               value={data.duration}
               onChange={(e) => patchStep(id, { duration: e.target.value })}
               placeholder="0"
-              className="nodrag nowheel w-8 bg-transparent text-right text-[11px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
             />
-            <span className="text-[11px] text-[#151f28]/45">uur</span>
+            <span className="text-[13px] text-[#151f28]/45">uur</span>
           </span>
         </label>
         <ChipInput
@@ -705,7 +804,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         <ChipInput
           icon={Wrench}
           label="Tools"
-          placeholder="Tools · Enter voor chip"
+          placeholder="Tools"
           values={asChipList(data.tools)}
           kind="tool"
           onChange={(tools) => patchStep(id, { tools })}
@@ -1638,6 +1737,15 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     [milestones, stepList]
   );
 
+  const chipSuggestions = useMemo<Record<ChipKind, string[]>>(
+    () => ({
+      person: uniqueChipList(stepList, (s) => asChipList(s.people)),
+      party: uniqueChipList(stepList, (s) => asChipList(s.parties)),
+      tool: uniqueChipList(stepList, (s) => asChipList(s.tools)),
+    }),
+    [stepList]
+  );
+
   const aiCountByMilestone = useMemo(() => {
     const totals = {} as Record<PrepMilestoneId, number>;
     for (const m of milestones) totals[m.id] = 0;
@@ -1691,12 +1799,14 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       patchSticky,
       deleteSticky,
       deleteConnection,
+      chipSuggestions,
     }),
     [
       addAi,
       addMilestone,
       addStep,
       aiCountByMilestone,
+      chipSuggestions,
       deleteAi,
       deleteConnection,
       deleteStep,

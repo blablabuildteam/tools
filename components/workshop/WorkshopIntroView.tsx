@@ -22,7 +22,6 @@ type Props = {
   intro: {
     todayGoal: string;
     discover: string[];
-    nextSteps: string[];
     agenda: string[];
     attendees: Attendee[];
   };
@@ -82,40 +81,38 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
 
         <section data-view-item className="mt-10 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
+            Aanwezig
+          </h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
+              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
+                {intro.attendees
+                  .filter((a) => a.org === "Sophista")
+                  .map((a) => (
+                    <AttendeeRow key={a.id} attendee={a} />
+                  ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
+              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
+                {intro.attendees
+                  .filter((a) => a.org === "BlaBlaBuild")
+                  .map((a) => (
+                    <AttendeeRow key={a.id} attendee={a} />
+                  ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Doel vandaag
           </h2>
           <p className="mt-3 text-[15px] leading-relaxed text-white/90">{intro.todayGoal}</p>
         </section>
-
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <section data-view-item className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-              Wat willen we achterhalen?
-            </h2>
-            <ul className="mt-4 space-y-3">
-              {intro.discover.map((item) => (
-                <li key={item} className="flex gap-3 text-[14px] leading-relaxed text-white/85">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-bla-lime" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section data-view-item className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-              Klaar als
-            </h2>
-            <ul className="mt-4 space-y-3">
-              {intro.nextSteps.map((item) => (
-                <li key={item} className="flex gap-3 text-[14px] leading-relaxed text-white/85">
-                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-bla-lime" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
 
         <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
@@ -141,30 +138,16 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
 
         <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-            Aanwezig
+            Wat willen we achterhalen?
           </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
-              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
-                {intro.attendees
-                  .filter((a) => a.org === "Sophista")
-                  .map((a) => (
-                    <AttendeeRow key={a.id} attendee={a} />
-                  ))}
-              </ul>
-            </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
-              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
-                {intro.attendees
-                  .filter((a) => a.org === "BlaBlaBuild")
-                  .map((a) => (
-                    <AttendeeRow key={a.id} attendee={a} />
-                  ))}
-              </ul>
-            </div>
-          </div>
+          <ul className="mt-4 space-y-3">
+            {intro.discover.map((item) => (
+              <li key={item} className="flex gap-3 text-[14px] leading-relaxed text-white/85">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-bla-lime" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
         </section>
 
         <div data-view-item className="mt-8 flex justify-end">
