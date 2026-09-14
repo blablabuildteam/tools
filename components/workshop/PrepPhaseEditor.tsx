@@ -27,6 +27,7 @@ import {
   asChipList,
   createDefaultPrepMilestones,
   normalizePrepStep,
+  sketchFingerprint,
   STICKY_COLORS,
   type PrepAiIdea,
   type PrepConnection,
@@ -35,6 +36,7 @@ import {
   type PrepPhaseSketch,
   type PrepStep,
   type PrepSticky,
+  type SketchPatchKey,
 } from "@/lib/workshop-types";
 
 const COL_W = 280;
@@ -1040,10 +1042,11 @@ function placeInColumn<T extends { id: string; milestoneId: PrepMilestoneId; ord
 
 type Props = {
   initial: PrepPhaseSketch;
-  onSave: (doc: PrepPhaseSketch) => void;
+  remote?: PrepPhaseSketch | null;
+  onSave: (doc: PrepPhaseSketch, touched: SketchPatchKey[]) => void;
 };
 
-function FlowCanvas({ initial, onSave }: Props) {
+function FlowCanvas({ initial, remote, onSave }: Props) {
   const { fitView, screenToFlowPosition } = useReactFlow();
   const [stepList, setStepList] = useState<PrepStep[]>(() => initial.steps.map(normalizePrepStep));
   const [aiList, setAiList] = useState<PrepAiIdea[]>(() => initial.aiIdeas ?? []);
@@ -1072,6 +1075,8 @@ function FlowCanvas({ initial, onSave }: Props) {
   const dragId = useRef<string | null>(null);
   const lastSlot = useRef("");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyKeys = useRef(new Set<SketchPatchKey>());
+  const saveGen = useRef(0);
   const statusRef = useRef<HTMLSpanElement>(null);
   const ready = useRef(false);
   const stepsRef = useRef(stepList);
@@ -1083,6 +1088,7 @@ function FlowCanvas({ initial, onSave }: Props) {
   const edgesRef = useRef(edges);
   const heightsRef = useRef<Record<string, number>>({});
   const pendingStickyFocus = useRef<string | null>(null);
+  const firstSketchActive = useRef(true);
   const [heightRev, setHeightRev] = useState(0);
   stepsRef.current = stepList;
   aiRef.current = aiList;
@@ -1099,24 +1105,61 @@ function FlowCanvas({ initial, onSave }: Props) {
     if (!dragging.current) setHeightRev((n) => n + 1);
   }, []);
 
-  const persist = useCallback(() => {
+  const persist = useCallback((...keys: SketchPatchKey[]) => {
     if (!ready.current) return;
+    for (const key of keys) dirtyKeys.current.add(key);
+    saveGen.current += 1;
+    const gen = saveGen.current;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     if (statusRef.current) statusRef.current.textContent = "Opslaan…";
     saveTimer.current = setTimeout(() => {
-      onSave({
-        type: "prep-phase-v1",
-        steps: stepsRef.current,
-        connections: fromRfEdges(edgesRef.current),
-        aiIdeas: aiRef.current,
-        milestones: milestonesRef.current,
-        stickies: stickiesRef.current,
-        showAiKansen: showAiRef.current,
-        revealedAiMilestoneIds: revealedAiRef.current,
-      });
+      const touched = [...dirtyKeys.current];
+      saveTimer.current = null;
+      onSave(
+        {
+          type: "prep-phase-v1",
+          steps: stepsRef.current,
+          connections: fromRfEdges(edgesRef.current),
+          aiIdeas: aiRef.current,
+          milestones: milestonesRef.current,
+          stickies: stickiesRef.current,
+          showAiKansen: showAiRef.current,
+          revealedAiMilestoneIds: revealedAiRef.current,
+        },
+        touched
+      );
       if (statusRef.current) statusRef.current.textContent = "Opgeslagen";
+      window.setTimeout(() => {
+        if (gen !== saveGen.current) return;
+        dirtyKeys.current.clear();
+      }, 800);
     }, 400);
   }, [onSave]);
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type !== "ws-sketch-active") return;
+      if (!event.data.active) return;
+      if (firstSketchActive.current) {
+        firstSketchActive.current = false;
+        return;
+      }
+      const root = flowWrapRef.current;
+      if (!root) return;
+      root.querySelectorAll<HTMLElement>(".react-flow__node").forEach((node, i) => {
+        node.style.setProperty("--view-i", String(Math.min(i, 12)));
+      });
+      root.classList.remove("is-view-enter");
+      void root.offsetWidth;
+      root.classList.add("is-view-enter");
+      window.setTimeout(() => {
+        root.classList.remove("is-view-enter");
+      }, 420);
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
 
   const structureKey = [
     milestones.map((m) => `${m.id}:${m.order}`).join("|"),
@@ -1147,6 +1190,60 @@ function FlowCanvas({ initial, onSave }: Props) {
       return laidOut.map((n) => (n.id === id && current ? { ...n, position: current.position } : n));
     });
   }, [setNodes]);
+
+  const applyDoc = useCallback(
+    (doc: PrepPhaseSketch) => {
+      const skip = dirtyKeys.current;
+      const steps = skip.has("steps") ? stepsRef.current : doc.steps.map(normalizePrepStep);
+      const ai = skip.has("aiIdeas") ? aiRef.current : (doc.aiIdeas ?? []);
+      const miles = skip.has("milestones")
+        ? milestonesRef.current
+        : (doc.milestones ?? createDefaultPrepMilestones());
+      const stickies = skip.has("stickies") ? stickiesRef.current : (doc.stickies ?? []);
+      const showAi = skip.has("showAiKansen") ? showAiRef.current : doc.showAiKansen === true;
+      const revealed = skip.has("revealedAiMilestoneIds")
+        ? revealedAiRef.current
+        : (doc.revealedAiMilestoneIds ?? []);
+      const connections = skip.has("connections") ? fromRfEdges(edgesRef.current) : doc.connections;
+
+      stepsRef.current = steps;
+      aiRef.current = ai;
+      milestonesRef.current = miles;
+      stickiesRef.current = stickies;
+      showAiRef.current = showAi;
+      revealedAiRef.current = revealed;
+
+      setStepList(steps);
+      setAiList(ai);
+      setMilestones(miles);
+      setStickyList(stickies);
+      setShowAiKansen(showAi);
+      setRevealedAiIds(revealed);
+
+      const styled = toRfEdges(connections, steps);
+      edgesRef.current = styled;
+      setEdges(styled);
+      applyLayout();
+    },
+    [applyLayout, setEdges]
+  );
+
+  useEffect(() => {
+    if (!remote) return;
+    if (dragging.current) return;
+    const local: PrepPhaseSketch = {
+      type: "prep-phase-v1",
+      steps: stepsRef.current,
+      connections: fromRfEdges(edgesRef.current),
+      aiIdeas: aiRef.current,
+      milestones: milestonesRef.current,
+      stickies: stickiesRef.current,
+      showAiKansen: showAiRef.current,
+      revealedAiMilestoneIds: revealedAiRef.current,
+    };
+    if (sketchFingerprint(remote) === sketchFingerprint(local)) return;
+    applyDoc(remote);
+  }, [applyDoc, remote]);
 
   useEffect(() => {
     applyLayout();
@@ -1195,7 +1292,7 @@ function FlowCanvas({ initial, onSave }: Props) {
             : n
         )
       );
-      persist();
+      persist("steps");
     },
     [persist, setNodes]
   );
@@ -1214,7 +1311,7 @@ function FlowCanvas({ initial, onSave }: Props) {
             : n
         )
       );
-      persist();
+      persist("aiIdeas");
     },
     [persist, setNodes]
   );
@@ -1236,7 +1333,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         edgesRef.current = next;
         return next;
       });
-      persist();
+      persist("steps", "connections");
     },
     [persist, setEdges]
   );
@@ -1253,7 +1350,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         aiRef.current = next;
         return next;
       });
-      persist();
+      persist("aiIdeas");
     },
     [persist]
   );
@@ -1279,7 +1376,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         stepsRef.current = next;
         return next;
       });
-      persist();
+      persist("steps");
     },
     [persist]
   );
@@ -1303,7 +1400,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         aiRef.current = next;
         return next;
       });
-      persist();
+      persist("aiIdeas");
     },
     [persist]
   );
@@ -1322,7 +1419,7 @@ function FlowCanvas({ initial, onSave }: Props) {
             : n
         )
       );
-      persist();
+      persist("milestones");
     },
     [persist, setNodes]
   );
@@ -1341,7 +1438,7 @@ function FlowCanvas({ initial, onSave }: Props) {
       milestonesRef.current = next;
       return next;
     });
-    persist();
+    persist("milestones");
   }, [persist]);
 
   const patchSticky = useCallback(
@@ -1358,7 +1455,7 @@ function FlowCanvas({ initial, onSave }: Props) {
             : n
         )
       );
-      persist();
+      persist("stickies");
     },
     [persist, setNodes]
   );
@@ -1370,7 +1467,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         stickiesRef.current = next;
         return next;
       });
-      persist();
+      persist("stickies");
     },
     [persist]
   );
@@ -1391,7 +1488,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         stickiesRef.current = next;
         return next;
       });
-      persist();
+      persist("stickies");
     },
     [persist]
   );
@@ -1456,7 +1553,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         revealedAiRef.current = next;
         setRevealedAiIds(next);
       }
-      persist();
+      persist("showAiKansen", "revealedAiMilestoneIds");
     },
     [persist]
   );
@@ -1515,7 +1612,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         const next = addEdge({ ...connection, id: `e-${nanoid(6)}` }, eds);
         const styled = toRfEdges(fromRfEdges(next), stepsRef.current);
         edgesRef.current = styled;
-        persist();
+        persist("connections");
         return styled;
       });
     },
@@ -1535,7 +1632,7 @@ function FlowCanvas({ initial, onSave }: Props) {
           return next;
         });
       }
-      if (shouldPersist) persist();
+      if (shouldPersist) persist("milestones");
       return;
     }
     const slotInfo = dropSlot(
@@ -1565,7 +1662,7 @@ function FlowCanvas({ initial, onSave }: Props) {
         });
       }
     }
-    if (shouldPersist) persist();
+    if (shouldPersist) persist(slotInfo.kind === "prep-step" ? "steps" : "aiIdeas");
   }, [persist]);
 
   const defaultEdgeOptions = useMemo(
@@ -1585,7 +1682,7 @@ function FlowCanvas({ initial, onSave }: Props) {
           onNodesChange={onNodesChange}
           onEdgesChange={(chs) => {
             onEdgesChange(chs);
-            persist();
+            persist("connections");
           }}
           onConnect={onConnect}
           onConnectStart={() => {
@@ -1657,7 +1754,7 @@ function FlowCanvas({ initial, onSave }: Props) {
                 stickiesRef.current = next;
                 return next;
               });
-              persist();
+              persist("stickies");
             } else if (
               node.type === "prep-step" ||
               node.type === "ai-idea" ||
@@ -1725,7 +1822,7 @@ function FlowCanvas({ initial, onSave }: Props) {
               const next = !showAiRef.current;
               showAiRef.current = next;
               setShowAiKansen(next);
-              persist();
+              persist("showAiKansen");
             }}
             className={`pointer-events-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-lg ring-1 ${
               showAiKansen

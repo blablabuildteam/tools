@@ -3,11 +3,14 @@ import { KV_READY, normalizeSessionId, redisCommand } from "@/lib/kv";
 import { hashPassword, unlockToken, verifyPassword } from "@/lib/password";
 import {
   applySketchPatch,
+  createDefaultColumns,
   createEmptyMeta,
   isSketchPatchKey,
+  normalizeColumns,
   publicMeta,
   type SketchPatchKey,
   type WorkshopCard,
+  type WorkshopColumn,
   type WorkshopIntro,
   type WorkshopMeta,
   type WorkshopSession,
@@ -78,6 +81,7 @@ function emptySession(partial?: Partial<WorkshopMeta>): WorkshopSession {
   return {
     meta: createEmptyMeta(partial),
     cards: [],
+    columns: createDefaultColumns(),
     sketch: null,
   };
 }
@@ -86,6 +90,7 @@ function clientPayload(session: WorkshopSession, unlocked: boolean) {
   return {
     meta: publicMeta(session.meta),
     cards: session.cards,
+    columns: normalizeColumns(session.columns),
     sketch: session.sketch,
     rev: session.rev ?? 0,
     kv: true,
@@ -109,6 +114,7 @@ export async function GET(
     return noStore({
       meta: createEmptyMeta(),
       cards: [],
+      columns: createDefaultColumns(),
       sketch: null,
       kv: false,
       unlocked: true,
@@ -123,6 +129,7 @@ export async function GET(
       return noStore({
         meta: publicMeta(session.meta),
         cards: [],
+        columns: [],
         sketch: null,
         rev: session.rev ?? 0,
         kv: true,
@@ -152,6 +159,7 @@ export async function GET(
     return noStore({
       meta: createEmptyMeta(),
       cards: [],
+      columns: createDefaultColumns(),
       sketch: null,
       kv: false,
       unlocked: true,
@@ -190,6 +198,10 @@ type Body =
   | {
       action: "replace-cards";
       cards: WorkshopCard[];
+    }
+  | {
+      action: "replace-columns";
+      columns: WorkshopColumn[];
     }
   | {
       action: "save-sketch";
@@ -319,6 +331,15 @@ export async function PUT(
     if (body.action === "replace-cards") {
       session = await mutateSession(params.sessionId, (next) => {
         next.cards = body.cards;
+      });
+      return noStore({ ok: true, ...clientPayload(session, true) });
+    }
+
+    if (body.action === "replace-columns") {
+      session = await mutateSession(params.sessionId, (next) => {
+        next.columns = normalizeColumns(body.columns);
+        const ids = new Set(next.columns.map((c) => c.id));
+        next.cards = next.cards.filter((c) => ids.has(c.columnId));
       });
       return noStore({ ok: true, ...clientPayload(session, true) });
     }

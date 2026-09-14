@@ -55,19 +55,22 @@ export default function WorkshopSummaryView({ summary, onChange }: Props) {
   return (
     <div className="h-full overflow-y-auto bg-[#0f1419] text-white">
       <div className="mx-auto max-w-3xl px-5 py-10 sm:px-8 sm:py-12">
-        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#ceff00]">
-          Afronding
-        </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Succes vandaag</h1>
-        <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/50">
-          Vul dit aan het eind in — dit is jullie gezamenlijke resultaat (A): gevalideerd proces +
-          prioriteit #1 + eerste tech-contour. Wordt automatisch opgeslagen.
-        </p>
+        <div data-view-item>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#ceff00]">
+            Afronding
+          </p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Succes vandaag</h1>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/50">
+            Vul dit aan het eind in — dit is jullie gezamenlijke resultaat (A): gevalideerd proces +
+            prioriteit #1 + eerste tech-contour. Wordt automatisch opgeslagen.
+          </p>
+        </div>
 
         <div className="mt-8 space-y-5">
           {FIELDS.map((field) => (
             <section
               key={field.key}
+              data-view-item
               className="rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6"
             >
               <label className="block">

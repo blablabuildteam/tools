@@ -15,15 +15,17 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
   return (
     <div className="h-full overflow-y-auto bg-bla-dark text-white">
       <div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
-        <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-bla-lime">
-          Workshop intro
-        </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-          Sophista × blablabuild
-        </h1>
-        <p className="mt-2 text-sm text-white/55">Dinsdag · 15:00–18:00</p>
+        <div data-view-item>
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-bla-lime">
+            Workshop intro
+          </p>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            Sophista × blablabuild
+          </h1>
+          <p className="mt-2 text-sm text-white/55">Dinsdag · 15:00–18:00</p>
+        </div>
 
-        <section className="mt-10 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+        <section data-view-item className="mt-10 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Doel vandaag
           </h2>
@@ -31,7 +33,7 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
         </section>
 
         <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <section className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+          <section data-view-item className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
               Wat willen we achterhalen?
             </h2>
@@ -45,7 +47,7 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
             </ul>
           </section>
 
-          <section className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+          <section data-view-item className="rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
               Klaar als
             </h2>
@@ -60,7 +62,7 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           </section>
         </div>
 
-        <section className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+        <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Agenda
           </h2>
@@ -76,7 +78,7 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           </ol>
         </section>
 
-        <section className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+        <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Aanwezig
           </h2>
@@ -107,7 +109,7 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           </div>
         </section>
 
-        <div className="mt-8 flex justify-end">
+        <div data-view-item className="mt-8 flex justify-end">
           <button
             type="button"
             onClick={onContinue}

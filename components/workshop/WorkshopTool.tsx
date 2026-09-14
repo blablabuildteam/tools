@@ -12,37 +12,44 @@ import {
   Sparkles,
   Unlock,
   ArrowLeft,
+  User,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
 import {
   CARD_COLORS,
-  WORKSHOP_COLUMNS,
+  createDefaultColumns,
   createEmptyIntro,
   createEmptySummary,
+  normalizeColumns,
   type WorkshopCard,
+  type WorkshopColumn,
   type WorkshopColumnId,
   type WorkshopMeta,
   type WorkshopSummary,
 } from "@/lib/workshop-types";
+import {
+  fetchWorkshopSession,
+  isEditingTextField,
+  readWorkshopDisplayName,
+  reportWorkshopSync,
+  startWorkshopPoll,
+  writeWorkshopDisplayName,
+  type WorkshopClientPayload,
+} from "@/lib/workshop-sync";
 import WorkshopBoard from "@/components/workshop/WorkshopBoard";
 import WorkshopSketch from "@/components/workshop/WorkshopSketch";
 import WorkshopIntroView from "@/components/workshop/WorkshopIntroView";
 import WorkshopSummaryView from "@/components/workshop/WorkshopSummaryView";
 import WorkshopReferenceView from "@/components/workshop/WorkshopReferenceView";
+import WorkshopSyncNotice from "@/components/workshop/WorkshopSyncNotice";
+import { ViewEnter } from "@/components/workshop/ViewEnter";
 import { BlablaLogo } from "@/components/BlablaLogo";
 
 type Tab = "intro" | "sketch" | "board" | "reference" | "wrap";
 
-type SessionPayload = {
-  meta: Omit<WorkshopMeta, "passwordHash">;
-  cards: WorkshopCard[];
-  sketch: unknown | null;
-  kv: boolean;
-  unlocked: boolean;
-  requiresPassword: boolean;
-};
+type SessionPayload = WorkshopClientPayload;
 
 function makeSessionId(company: string) {
   const slug = company
@@ -66,6 +73,7 @@ export default function WorkshopTool() {
   const [tab, setTab] = useState<Tab>("intro");
   const [meta, setMeta] = useState<Omit<WorkshopMeta, "passwordHash"> | null>(null);
   const [cards, setCards] = useState<WorkshopCard[]>([]);
+  const [columns, setColumns] = useState<WorkshopColumn[]>(createDefaultColumns);
   const [sketch, setSketch] = useState<unknown | null>(null);
   const [sketchOpened, setSketchOpened] = useState(false);
   const [sketchGen, setSketchGen] = useState(0);
@@ -76,7 +84,10 @@ export default function WorkshopTool() {
   const [error, setError] = useState<string | null>(null);
   const skipPoll = useRef(false);
   const sketchDirty = useRef(false);
+  const summaryDirty = useRef(false);
+  const columnsDirty = useRef(false);
   const tabRef = useRef<Tab>("intro");
+  const revRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     tabRef.current = tab;
@@ -95,8 +106,11 @@ export default function WorkshopTool() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get("s");
-    const name = params.get("name");
-    if (name) setAuthor(name);
+    const name = (params.get("name") || readWorkshopDisplayName()).trim();
+    if (name) {
+      setAuthor(name);
+      writeWorkshopDisplayName(name);
+    }
     if (s) {
       setJoinCode(s);
       void joinSession(s);
@@ -104,26 +118,63 @@ export default function WorkshopTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (author.trim()) writeWorkshopDisplayName(author);
+  }, [author]);
+
   const applyPayload = useCallback(
-    (data: SessionPayload, opts?: { keepLocalSketch?: boolean; cardsOnly?: boolean }) => {
+    (data: SessionPayload, opts?: { keepLocalSketch?: boolean; poll?: boolean }) => {
+      if (data.unchanged) return;
       if (data.requiresPassword) {
         setLocked(true);
         return;
       }
       setLocked(false);
-      setMeta(data.meta);
-      setCards(data.cards ?? []);
       setKv(Boolean(data.kv));
-      if (opts?.cardsOnly || opts?.keepLocalSketch || sketchDirty.current) return;
-      setSketch(data.sketch ?? null);
+
+      const skipBoard = Boolean(
+        opts?.poll &&
+          (columnsDirty.current || (tabRef.current === "board" && isEditingTextField()))
+      );
+      const skipSummary = Boolean(
+        opts?.poll && (summaryDirty.current || (tabRef.current === "wrap" && isEditingTextField()))
+      );
+
+      if (!skipBoard) {
+        setCards(data.cards ?? []);
+        setColumns(normalizeColumns(data.columns));
+      }
+
+      if (skipSummary) {
+        setMeta((prev) => (prev ? { ...data.meta, summary: prev.summary } : data.meta));
+      } else {
+        setMeta(data.meta);
+      }
+
+      const prevRev = revRef.current;
+      if (!skipBoard && !skipSummary) {
+        if (typeof data.rev === "number") revRef.current = data.rev;
+      }
+
+      if (
+        opts?.poll &&
+        !skipBoard &&
+        !skipSummary &&
+        typeof data.rev === "number" &&
+        data.rev !== prevRev
+      ) {
+        reportWorkshopSync("incoming");
+      }
+
+      if (opts?.keepLocalSketch || sketchDirty.current) return;
+      if (!opts?.poll) setSketch(data.sketch ?? null);
     },
     []
   );
 
   const loadSession = useCallback(
-    async (sid: string, opts?: { cardsOnly?: boolean }) => {
-      const res = await fetch(`/api/workshop-sessions/${sid}`);
-      const data = (await res.json()) as SessionPayload;
+    async (sid: string, opts?: { poll?: boolean }) => {
+      const data = await fetchWorkshopSession(sid, opts?.poll ? { rev: revRef.current } : undefined);
       applyPayload(data, opts);
       return data;
     },
@@ -212,36 +263,55 @@ export default function WorkshopTool() {
 
   useEffect(() => {
     if (landing || !sessionId || locked) return;
-    const t = setInterval(async () => {
-      if (skipPoll.current) return;
-      if (tabRef.current === "sketch") return;
-      try {
-        await loadSession(sessionId, { cardsOnly: true });
-      } catch {
-        /* ignore */
-      }
-    }, 10000);
-    return () => clearInterval(t);
-  }, [landing, sessionId, locked, loadSession]);
+    return startWorkshopPoll({
+      sessionId,
+      getRev: () => revRef.current,
+      shouldSkip: () => skipPoll.current,
+      onPayload: (data) => applyPayload(data, { poll: true }),
+    });
+  }, [landing, sessionId, locked, applyPayload]);
 
-  const persistCards = useCallback(
-    async (next: WorkshopCard[]) => {
-      setCards(next);
+  const columnsDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const persistColumns = useCallback(
+    async (next: WorkshopColumn[]) => {
+      if (columnsDebounce.current) clearTimeout(columnsDebounce.current);
+      setColumns(next);
       if (!sessionId) return;
       skipPoll.current = true;
+      columnsDirty.current = true;
+      reportWorkshopSync("saving");
       try {
-        await fetch(`/api/workshop-sessions/${sessionId}`, {
+        const res = await fetch(`/api/workshop-sessions/${sessionId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "replace-cards", cards: next }),
+          body: JSON.stringify({ action: "replace-columns", columns: next }),
         });
+        const data = (await res.json()) as SessionPayload;
+        if (typeof data.rev === "number") revRef.current = data.rev;
       } finally {
         setTimeout(() => {
           skipPoll.current = false;
+          columnsDirty.current = false;
         }, 800);
       }
     },
     [sessionId]
+  );
+
+  const onChangeColumn = useCallback(
+    (column: WorkshopColumn) => {
+      columnsDirty.current = true;
+      setColumns((prev) => {
+        const next = prev.map((c) => (c.id === column.id ? column : c));
+        if (columnsDebounce.current) clearTimeout(columnsDebounce.current);
+        columnsDebounce.current = setTimeout(() => {
+          void persistColumns(next);
+        }, 450);
+        return next;
+      });
+    },
+    [persistColumns]
   );
 
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -261,15 +331,21 @@ export default function WorkshopTool() {
 
       const flush = () => {
         skipPoll.current = true;
+        reportWorkshopSync("saving");
         void fetch(`/api/workshop-sessions/${sessionId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "upsert-card", card }),
-        }).finally(() => {
-          setTimeout(() => {
-            skipPoll.current = false;
-          }, 800);
-        });
+        })
+          .then(async (res) => {
+            const data = (await res.json()) as SessionPayload;
+            if (typeof data.rev === "number") revRef.current = data.rev;
+          })
+          .finally(() => {
+            setTimeout(() => {
+              skipPoll.current = false;
+            }, 800);
+          });
       };
 
       if (opts?.immediate) {
@@ -290,12 +366,15 @@ export default function WorkshopTool() {
       setCards(next);
       if (!sessionId) return;
       skipPoll.current = true;
+      reportWorkshopSync("saving");
       try {
-        await fetch(`/api/workshop-sessions/${sessionId}`, {
+        const res = await fetch(`/api/workshop-sessions/${sessionId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "delete-card", id }),
         });
+        const data = (await res.json()) as SessionPayload;
+        if (typeof data.rev === "number") revRef.current = data.rev;
       } finally {
         setTimeout(() => {
           skipPoll.current = false;
@@ -310,15 +389,23 @@ export default function WorkshopTool() {
       setMeta((prev) => (prev ? { ...prev, summary } : prev));
       if (!sessionId) return;
       skipPoll.current = true;
+      summaryDirty.current = true;
+      reportWorkshopSync("saving");
       void fetch(`/api/workshop-sessions/${sessionId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "update-summary", summary }),
-      }).finally(() => {
-        setTimeout(() => {
-          skipPoll.current = false;
-        }, 800);
-      });
+      })
+        .then(async (res) => {
+          const data = (await res.json()) as SessionPayload;
+          if (typeof data.rev === "number") revRef.current = data.rev;
+        })
+        .finally(() => {
+          setTimeout(() => {
+            skipPoll.current = false;
+            summaryDirty.current = false;
+          }, 800);
+        });
     },
     [sessionId]
   );
@@ -326,6 +413,7 @@ export default function WorkshopTool() {
   const summaryDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSummaryChange = useCallback(
     (summary: WorkshopSummary) => {
+      summaryDirty.current = true;
       setMeta((prev) => (prev ? { ...prev, summary } : prev));
       if (summaryDebounce.current) clearTimeout(summaryDebounce.current);
       summaryDebounce.current = setTimeout(() => saveSummary(summary), 500);
@@ -348,19 +436,31 @@ export default function WorkshopTool() {
   function addCard(columnId: WorkshopColumnId) {
     const now = new Date().toISOString();
     const inCol = cards.filter((c) => c.columnId === columnId);
+    const accent = columns.find((c) => c.id === columnId)?.color ?? CARD_COLORS[0];
     const card: WorkshopCard = {
       id: nanoid(10),
       columnId,
       title: "",
       body: "",
-      author: author || "anon",
+      author: author.trim() || readWorkshopDisplayName() || "anon",
       votes: [],
-      color: CARD_COLORS[inCol.length % CARD_COLORS.length],
+      color: accent,
       order: inCol.length,
       createdAt: now,
       updatedAt: now,
     };
     upsertCard(card, { immediate: true });
+  }
+
+  function addColumn() {
+    const col: WorkshopColumn = {
+      id: nanoid(10),
+      title: "",
+      hint: "",
+      color: CARD_COLORS[columns.length % CARD_COLORS.length],
+      order: columns.length,
+    };
+    void persistColumns([...columns, col]);
   }
 
   if (landing || locked) {
@@ -482,7 +582,7 @@ export default function WorkshopTool() {
   }
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#0f1419] text-bla-white">
+    <div className="relative flex h-[100dvh] flex-col overflow-hidden bg-[#0f1419] text-bla-white">
       <header className="z-30 shrink-0 border-b border-white/[0.07] bg-[#0f1419]/90 backdrop-blur-xl">
         <div className="flex items-center gap-3 px-3 py-2.5 sm:gap-4 sm:px-5">
           <Link
@@ -536,6 +636,17 @@ export default function WorkshopTool() {
             })}
           </nav>
 
+          <label className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1.5 ring-1 ring-white/10 sm:px-3">
+            <User className="h-3.5 w-3.5 shrink-0 text-white/35" />
+            <input
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Jouw naam"
+              aria-label="Jouw naam"
+              className="w-[6.5rem] bg-transparent text-[11px] text-white/80 outline-none placeholder:text-white/30 sm:w-[7.5rem]"
+            />
+          </label>
+
           <button
             type="button"
             onClick={() => void copyShare()}
@@ -548,43 +659,43 @@ export default function WorkshopTool() {
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[#0f1419]">
-        <div className={`h-full overflow-y-auto ${tab === "intro" ? "" : "hidden"}`}>
+        <ViewEnter active={tab === "intro"} className="h-full overflow-y-auto">
           <WorkshopIntroView
             intro={meta?.intro ?? createEmptyIntro()}
             onContinue={openSketch}
           />
-        </div>
+        </ViewEnter>
 
-        <div className={`h-full overflow-x-auto ${tab === "board" ? "" : "hidden"}`}>
-          <div className="border-b border-white/8 px-5 py-3 sm:px-6">
+        <ViewEnter active={tab === "board"} className="h-full overflow-x-auto">
+          <div data-view-item className="border-b border-white/8 px-5 py-3 sm:px-6">
             <p className="text-sm font-semibold text-white">Notities naast de schets</p>
             <p className="text-[12px] text-white/40">
-              Drie kolommen — geen procesplaat. Schets blijft de Voorbereidingsfase.
+              Vrije secties — titel en beschrijving kun je zelf invullen.
             </p>
           </div>
           <WorkshopBoard
-            columns={[...WORKSHOP_COLUMNS]}
-            cards={cards.filter((c) =>
-              WORKSHOP_COLUMNS.some((col) => col.id === c.columnId)
-            )}
-            author={author || "anon"}
+            columns={columns}
+            cards={cards.filter((c) => columns.some((col) => col.id === c.columnId))}
+            author={author.trim() || readWorkshopDisplayName() || "anon"}
+            active={tab === "board"}
             onAdd={addCard}
             onChange={(card) => upsertCard(card)}
             onDelete={(id) => void deleteCard(id)}
-            onMove={(next) => void persistCards(next)}
+            onChangeColumn={onChangeColumn}
+            onAddColumn={addColumn}
           />
-        </div>
+        </ViewEnter>
 
-        <div className={`h-full overflow-y-auto ${tab === "reference" ? "" : "hidden"}`}>
+        <ViewEnter active={tab === "reference"} className="h-full overflow-y-auto">
           <WorkshopReferenceView sessionId={sessionId} active={tab === "reference"} />
-        </div>
+        </ViewEnter>
 
-        <div className={`h-full overflow-y-auto ${tab === "wrap" ? "" : "hidden"}`}>
+        <ViewEnter active={tab === "wrap"} className="h-full overflow-y-auto">
           <WorkshopSummaryView
             summary={meta?.summary ?? createEmptySummary()}
             onChange={onSummaryChange}
           />
-        </div>
+        </ViewEnter>
 
         {sketchOpened && (
           <div
@@ -604,6 +715,7 @@ export default function WorkshopTool() {
           </div>
         )}
       </div>
+      {tab !== "sketch" ? <WorkshopSyncNotice variant="dark" corner="bottom-right" /> : null}
     </div>
   );
 }

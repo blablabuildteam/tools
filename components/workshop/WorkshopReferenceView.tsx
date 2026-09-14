@@ -4,10 +4,18 @@ import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  fetchWorkshopSession,
+  isEditingTextField,
+  reportWorkshopSync,
+  startWorkshopPoll,
+  type WorkshopClientPayload,
+} from "@/lib/workshop-sync";
+import {
   SOPHISTA_IM_STRUCTURE,
   SOPHISTA_LATER_PHASES,
   isPrepPhaseSketch,
   normalizePrepPhase,
+  sketchFingerprint,
   type PrepAiIdea,
   type PrepMilestone,
   type PrepMilestoneId,
@@ -41,22 +49,43 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
   const [status, setStatus] = useState("…");
   const docRef = useRef<PrepPhaseSketch | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyRef = useRef(false);
+  const revRef = useRef<number | undefined>(undefined);
+  const fingerprintRef = useRef("");
+  const rootRef = useRef<HTMLDivElement>(null);
   docRef.current = doc;
 
   const persist = useCallback(
     (next: PrepPhaseSketch, immediate = false) => {
       setDoc(next);
       docRef.current = next;
+      fingerprintRef.current = sketchFingerprint(next);
       if (!sessionId) return;
+      dirtyRef.current = true;
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const flush = () => {
         saveTimer.current = null;
         setStatus("Opslaan…");
+        reportWorkshopSync("saving");
         void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "save-sketch", sketch: next }),
-        }).then(() => setStatus("Opgeslagen"));
+          body: JSON.stringify({
+            action: "save-sketch",
+            sketch: { aiIdeas: next.aiIdeas },
+            touched: ["aiIdeas"],
+          }),
+        })
+          .then(async (res) => {
+            const data = (await res.json()) as WorkshopClientPayload;
+            if (typeof data.rev === "number") revRef.current = data.rev;
+            setStatus("Opgeslagen");
+          })
+          .finally(() => {
+            window.setTimeout(() => {
+              dirtyRef.current = false;
+            }, 800);
+          });
       };
       if (immediate) flush();
       else {
@@ -70,10 +99,7 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
   const load = useCallback(async () => {
     if (!sessionId) return;
     try {
-      const res = await fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
-        cache: "no-store",
-      });
-      const data = await res.json();
+      const data = await fetchWorkshopSession(sessionId);
       if (data.requiresPassword) {
         setMissing(true);
         setDoc(null);
@@ -85,9 +111,11 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
         setDoc(null);
         return;
       }
+      if (typeof data.rev === "number") revRef.current = data.rev;
       setMissing(false);
       setDoc(next);
       docRef.current = next;
+      fingerprintRef.current = sketchFingerprint(next);
       setStatus("Geladen");
       if (!isPrepPhaseSketch(data.sketch) || !Array.isArray((data.sketch as PrepPhaseSketch).aiIdeas)) {
         persist(next, true);
@@ -105,10 +133,17 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
         saveTimer.current = null;
         const current = docRef.current;
         if (current && sessionId) {
+          dirtyRef.current = true;
           void fetch(`/api/workshop-sessions/${encodeURIComponent(sessionId)}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "save-sketch", sketch: current }),
+            body: JSON.stringify({
+              action: "save-sketch",
+              sketch: { aiIdeas: current.aiIdeas },
+              touched: ["aiIdeas"],
+            }),
+          }).finally(() => {
+            dirtyRef.current = false;
           });
         }
       }
@@ -119,6 +154,32 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
     }, 450);
     return () => window.clearTimeout(t);
   }, [active, load, sessionId]);
+
+  useEffect(() => {
+    if (!active || !sessionId) return;
+    return startWorkshopPoll({
+      sessionId,
+      getRev: () => revRef.current,
+      shouldSkip: () =>
+        dirtyRef.current ||
+        Boolean(saveTimer.current) ||
+        (Boolean(rootRef.current?.contains(document.activeElement)) && isEditingTextField()),
+      onPayload: (data) => {
+        if (data.requiresPassword) return;
+        const next = normalizePrepPhase(data.sketch);
+        if (!next) return;
+        if (typeof data.rev === "number") revRef.current = data.rev;
+        const fp = sketchFingerprint(next);
+        if (fp === fingerprintRef.current) return;
+        fingerprintRef.current = fp;
+        setMissing(false);
+        setDoc(next);
+        docRef.current = next;
+        setStatus("Live");
+        reportWorkshopSync("incoming");
+      },
+    });
+  }, [active, sessionId]);
 
   const patchAi = useCallback(
     (id: string, partial: Partial<PrepAiIdea>) => {
@@ -176,9 +237,9 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
   const milestones = [...(doc?.milestones ?? [])].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="h-full overflow-y-auto bg-[#0f1419] text-white">
+    <div ref={rootRef} className="h-full overflow-y-auto bg-[#0f1419] text-white">
       <div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-12">
-        <div className="flex flex-wrap items-end justify-between gap-3">
+        <div data-view-item className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[#ceff00]">
               Zelfde data als de schets
@@ -193,7 +254,7 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
         </div>
 
         {missing && (
-          <p className="mt-8 rounded-2xl border border-white/10 bg-[#161d26] px-5 py-4 text-sm text-white/60">
+          <p data-view-item className="mt-8 rounded-2xl border border-white/10 bg-[#161d26] px-5 py-4 text-sm text-white/60">
             Nog geen voorbereidingsfase-schets. Open eerst het tabblad Schets.
           </p>
         )}
@@ -217,7 +278,7 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
           ))}
         </div>
 
-        <section className="mt-10 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
+        <section data-view-item className="mt-10 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
             IM-structuur (prompt)
           </h2>
@@ -234,7 +295,7 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
           </ol>
         </section>
 
-        <section className="mt-5 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
+        <section data-view-item className="mt-5 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
             Later in het verkoopproces
           </h2>
@@ -271,7 +332,11 @@ function MilestoneBlock({
   onAdd: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
+    <section
+      data-view-item
+      style={{ ["--view-i" as string]: Math.min(index + 1, 10) }}
+      className="rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6"
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ceff00]">

@@ -1,10 +1,20 @@
-import type { WorkshopCard, WorkshopMeta } from "@/lib/workshop-types";
+import type { WorkshopCard, WorkshopColumn, WorkshopMeta } from "@/lib/workshop-types";
 
 export const WORKSHOP_POLL_MS = 1500;
+export const WORKSHOP_SYNC_HOLD_MS = 2000;
+export const WORKSHOP_SYNC_EVENT = "workshop-sync";
+
+export type WorkshopSyncKind = "saving" | "incoming";
+
+export function reportWorkshopSync(kind: WorkshopSyncKind) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(WORKSHOP_SYNC_EVENT, { detail: { kind } }));
+}
 
 export type WorkshopClientPayload = {
   meta: Omit<WorkshopMeta, "passwordHash">;
   cards: WorkshopCard[];
+  columns?: WorkshopColumn[];
   sketch: unknown | null;
   kv: boolean;
   unlocked: boolean;
@@ -24,6 +34,25 @@ export async function fetchWorkshopSession(
     signal: opts?.signal,
   });
   return (await res.json()) as WorkshopClientPayload;
+}
+
+export const WORKSHOP_NAME_KEY = "workshop:display-name";
+
+export function readWorkshopDisplayName(): string {
+  try {
+    return (window.localStorage.getItem(WORKSHOP_NAME_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+export function writeWorkshopDisplayName(name: string) {
+  try {
+    const trimmed = name.trim();
+    if (trimmed) window.localStorage.setItem(WORKSHOP_NAME_KEY, trimmed);
+  } catch {
+    /* ignore quota / private mode */
+  }
 }
 
 export function isEditingTextField(): boolean {

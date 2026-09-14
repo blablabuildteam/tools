@@ -1,22 +1,73 @@
-export const WORKSHOP_COLUMNS = [
+export const CARD_COLORS = [
+  "#CEFF00",
+  "#7DD3FC",
+  "#F9A8D4",
+  "#FCD34D",
+  "#A78BFA",
+  "#86EFAC",
+  "#FDBA74",
+] as const;
+
+export type WorkshopColumn = {
+  id: string;
+  title: string;
+  hint: string;
+  color: string;
+  order: number;
+};
+
+export const WORKSHOP_COLUMNS: readonly Omit<WorkshopColumn, "order">[] = [
   {
     id: "notes",
     title: "Pijn & notities",
     hint: "Correcties op de schets, frictie, wie doet wat",
+    color: CARD_COLORS[0],
   },
   {
     id: "directions",
     title: "Kans #1",
     hint: "Gekozen AI-kans + waarom die eerst",
+    color: CARD_COLORS[1],
   },
   {
     id: "tech",
     title: "Tech-contour",
     hint: "Bronnen, templates, review, output-formaat",
+    color: CARD_COLORS[2],
   },
-] as const;
+];
 
-export type WorkshopColumnId = (typeof WORKSHOP_COLUMNS)[number]["id"];
+export type WorkshopColumnId = string;
+
+export function createDefaultColumns(): WorkshopColumn[] {
+  return WORKSHOP_COLUMNS.map((col, i) => ({ ...col, order: i }));
+}
+
+export function normalizeColumns(raw: unknown): WorkshopColumn[] {
+  if (raw === undefined || raw === null || !Array.isArray(raw)) {
+    return createDefaultColumns();
+  }
+  return raw
+    .map((item, i) => {
+      if (!item || typeof item !== "object") return null;
+      const col = item as Partial<WorkshopColumn>;
+      const id = typeof col.id === "string" ? col.id.trim() : "";
+      if (!id) return null;
+      return {
+        id,
+        title: typeof col.title === "string" ? col.title : "",
+        hint: typeof col.hint === "string" ? col.hint : "",
+        color:
+          typeof col.color === "string" && col.color
+            ? col.color
+            : CARD_COLORS[i % CARD_COLORS.length],
+        order: typeof col.order === "number" && Number.isFinite(col.order) ? col.order : i,
+      };
+    })
+    .filter((c): c is WorkshopColumn => Boolean(c))
+    .sort((a, b) => a.order - b.order)
+    .map((c, i) => ({ ...c, order: i }));
+}
 
 export type WorkshopCard = {
   id: string;
@@ -71,20 +122,11 @@ export type WorkshopMeta = {
 export type WorkshopSession = {
   meta: WorkshopMeta;
   cards: WorkshopCard[];
+  columns?: WorkshopColumn[];
   sketch: unknown | null;
   /** Monotonic write counter for cheap poll short-circuit. */
   rev?: number;
 };
-
-export const CARD_COLORS = [
-  "#CEFF00",
-  "#7DD3FC",
-  "#F9A8D4",
-  "#FCD34D",
-  "#A78BFA",
-  "#86EFAC",
-  "#FDBA74",
-] as const;
 
 export const STICKY_COLORS = [
   "#FDE047",
@@ -334,6 +376,8 @@ export type PrepStep = {
   /** External parties. */
   parties: string[];
   tools: string[];
+  /** Marked as a friction / pain point in the process. */
+  painPoint: boolean;
   order: number;
 };
 
@@ -466,6 +510,7 @@ export function normalizePrepStep(step: PrepStep & {
     people,
     parties,
     tools: asChipList(step.tools),
+    painPoint: step.painPoint === true,
     order: typeof step.order === "number" ? step.order : 0,
   };
 }
