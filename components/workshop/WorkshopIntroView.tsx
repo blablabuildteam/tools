@@ -1,15 +1,70 @@
 "use client";
 
+import Image from "next/image";
+import { attendeePhotoUrl } from "@/lib/workshop-types";
+
+type Attendee = {
+  id: string;
+  name: string;
+  org?: string;
+  role?: string;
+  photo?: string;
+};
+
+const AGENDA = [
+  "Focus op het huidige proces",
+  "AI-kansen identificeren",
+  "Eerste technische aanpak van een oplossing vormgeven",
+  "Recap en vervolgstappen",
+];
+
 type Props = {
   intro: {
     todayGoal: string;
     discover: string[];
     nextSteps: string[];
     agenda: string[];
-    attendees: { id: string; name: string; org?: string; role?: string }[];
+    attendees: Attendee[];
   };
   onContinue: () => void;
 };
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function AttendeeRow({ attendee }: { attendee: Attendee }) {
+  const photo = attendeePhotoUrl(attendee);
+  return (
+    <li className="flex items-center gap-3">
+      {photo ? (
+        <Image
+          src={photo}
+          alt=""
+          width={40}
+          height={40}
+          className="h-10 w-10 shrink-0 rounded-full object-cover object-top ring-1 ring-white/15"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-[11px] font-semibold text-white/70 ring-1 ring-white/10"
+        >
+          {initials(attendee.name)}
+        </span>
+      )}
+      <span>
+        {attendee.name}
+        {attendee.role ? <span className="text-white/45"> · {attendee.role}</span> : null}
+      </span>
+    </li>
+  );
+}
 
 export default function WorkshopIntroView({ intro, onContinue }: Props) {
   return (
@@ -66,13 +121,19 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Agenda
           </h2>
+          <p className="mt-3 text-[14px] leading-relaxed text-white/60">
+            We hebben 3 uur beschikbaar (15:00–18:00). Waarschijnlijk hebben we niet alle tijd nodig.
+          </p>
           <ol className="mt-4 space-y-2.5">
-            {intro.agenda.map((item) => (
+            {AGENDA.map((item, index) => (
               <li
                 key={item}
-                className="rounded-xl border border-white/8 bg-black/25 px-4 py-3 text-[14px] leading-relaxed text-white/90"
+                className="flex items-start gap-3 rounded-xl border border-white/8 bg-black/25 px-4 py-3 text-[14px] leading-relaxed text-white/90"
               >
-                {item}
+                <span className="mt-0.5 font-mono text-[12px] font-semibold text-bla-lime">
+                  {index + 1}.
+                </span>
+                <span>{item}</span>
               </li>
             ))}
           </ol>
@@ -85,24 +146,21 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
-              <ul className="mt-2 space-y-1.5 text-[14px] text-white/90">
+              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
                 {intro.attendees
                   .filter((a) => a.org === "BlaBlaBuild")
                   .map((a) => (
-                    <li key={a.id}>{a.name}</li>
+                    <AttendeeRow key={a.id} attendee={a} />
                   ))}
               </ul>
             </div>
             <div>
               <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
-              <ul className="mt-2 space-y-1.5 text-[14px] text-white/90">
+              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
                 {intro.attendees
                   .filter((a) => a.org === "Sophista")
                   .map((a) => (
-                    <li key={a.id}>
-                      {a.name}
-                      {a.role ? <span className="text-white/45"> · {a.role}</span> : null}
-                    </li>
+                    <AttendeeRow key={a.id} attendee={a} />
                   ))}
               </ul>
             </div>

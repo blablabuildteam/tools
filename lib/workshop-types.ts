@@ -87,8 +87,24 @@ export type WorkshopAttendee = {
   name: string;
   org?: string;
   role?: string;
+  photo?: string;
   joinedAt: string;
 };
+
+export const ATTENDEE_PHOTO_BY_ID: Record<string, string> = {
+  a1: "/workshop/attendees/kevin-roos.png",
+  a2: "/workshop/attendees/xennith-oosterveer.webp",
+  a3: "/workshop/attendees/andre-scheirlinck.jpg",
+  a4: "/workshop/attendees/dave-nijhuis.jpg",
+  a5: "/workshop/attendees/joost-van-den-bos.jpg",
+};
+
+export function attendeePhotoUrl(attendee: {
+  id: string;
+  photo?: string;
+}): string | undefined {
+  return attendee.photo || ATTENDEE_PHOTO_BY_ID[attendee.id];
+}
 
 export type WorkshopIntro = {
   todayGoal: string;

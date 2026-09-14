@@ -69,6 +69,69 @@ if (typeof existingRaw === "string") {
 const resetSketch = process.argv.includes("--reset-sketch");
 const keepSketch = !resetSketch && Boolean(existing?.sketch);
 
+const attendees = [
+  {
+    id: "a1",
+    name: "Kevin Roos van Raadshooven",
+    org: "BlaBlaBuild",
+    photo: "/workshop/attendees/kevin-roos.png",
+    joinedAt: now,
+  },
+  {
+    id: "a2",
+    name: "Xennith Oosterveer",
+    org: "BlaBlaBuild",
+    photo: "/workshop/attendees/xennith-oosterveer.webp",
+    joinedAt: now,
+  },
+  {
+    id: "a3",
+    name: "André Scheirlinck",
+    org: "Sophista",
+    photo: "/workshop/attendees/andre-scheirlinck.jpg",
+    joinedAt: now,
+  },
+  {
+    id: "a4",
+    name: "Dave Nijhuis",
+    org: "Sophista",
+    photo: "/workshop/attendees/dave-nijhuis.jpg",
+    joinedAt: now,
+  },
+  {
+    id: "a5",
+    name: "Joost van den Bos",
+    org: "Sophista",
+    role: "IT manager",
+    photo: "/workshop/attendees/joost-van-den-bos.jpg",
+    joinedAt: now,
+  },
+];
+
+const defaultIntro = {
+  todayGoal:
+    "Het begin van Sophista’s bedrijfsverkoopproces scherp krijgen — informatie verzamelen versnellen → gestandaardiseerd rapport — plus oplossingsrichtingen + tech-contour.",
+  discover: [
+    "Hoe loopt ‘informatie verzamelen → rapport’ nu precies?",
+    "Waar zit de meeste tijd / frictie / kwaliteitsverlies?",
+    "Wat is een realistische eerste gestandaardiseerde output?",
+    "Welke AI-richting eerst?",
+    "Waar moeten we technisch rekening mee houden voor latere uitbreidingen?",
+  ],
+  agenda: [
+    "Focus op het huidige proces",
+    "AI-kansen identificeren",
+    "Eerste technische aanpak van een oplossing vormgeven",
+    "Recap en vervolgstappen",
+  ],
+  nextSteps: [
+    "Succes vandaag: gevalideerd proces + prioriteit #1 + tech-contour",
+    "Open vragen vastleggen",
+    "Vervolg: bouwvoorstel (B) later",
+  ],
+  attendees,
+};
+
 const session = {
   meta: {
     title: "Sophista × blablabuild",
@@ -77,43 +140,9 @@ const session = {
     createdAt: existing?.meta?.createdAt || now,
     updatedAt: now,
     passwordProtected: false,
-    intro: existing?.meta?.intro || {
-      todayGoal:
-        "Het begin van Sophista’s bedrijfsverkoopproces scherp krijgen — informatie verzamelen versnellen → gestandaardiseerd rapport — plus oplossingsrichtingen + tech-contour.",
-      discover: [
-        "Hoe loopt ‘informatie verzamelen → rapport’ nu precies?",
-        "Waar zit de meeste tijd / frictie / kwaliteitsverlies?",
-        "Wat is een realistische eerste gestandaardiseerde output?",
-        "Welke AI-richting eerst?",
-        "Waar moeten we technisch rekening mee houden voor latere uitbreidingen?",
-      ],
-      agenda: [
-        "15:00–15:15 · Intro & check-in",
-        "15:15–16:15 · Schets: proces valideren / bijtekenen",
-        "16:15–16:30 · Pauze",
-        "16:30–17:15 · Pijn & richtingen prioriteren",
-        "17:15–17:45 · Tech-contour #1",
-        "17:45–18:00 · Afronding",
-      ],
-      nextSteps: [
-        "Succes vandaag: gevalideerd proces + prioriteit #1 + tech-contour",
-        "Open vragen vastleggen",
-        "Vervolg: bouwvoorstel (B) later",
-      ],
-      attendees: [
-        { id: "a1", name: "Kevin Roos van Raadshooven", org: "BlaBlaBuild", joinedAt: now },
-        { id: "a2", name: "Xennith Oosterveer", org: "BlaBlaBuild", joinedAt: now },
-        { id: "a3", name: "André Scheirlinck", org: "Sophista", joinedAt: now },
-        { id: "a4", name: "Dave Nijhuis", org: "Sophista", joinedAt: now },
-        {
-          id: "a5",
-          name: "IT manager",
-          org: "Sophista",
-          role: "IT (naam nog invullen)",
-          joinedAt: now,
-        },
-      ],
-    },
+    intro: existing?.meta?.intro
+      ? { ...existing.meta.intro, attendees, agenda: defaultIntro.agenda }
+      : defaultIntro,
     summary: existing?.meta?.summary || {
       validatedProcess: "",
       priorityOne: "",
@@ -220,15 +249,19 @@ const session = {
         ],
         stickies: [],
       },
+  rev: (existing?.rev ?? 0) + 1,
+  columns: existing?.columns,
 };
 
 await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
+const names = attendees.map((a) => (a.role ? `${a.name} · ${a.role}` : a.name)).join(", ");
 console.log(
   keepSketch
     ? `Kept existing schets (${existing.sketch?.type || "unknown"})`
     : "Reset schets → empty Voorbereidingsfase milestones"
 );
+console.log(`Attendees: ${names}`);
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
 console.log("Local: http://localhost:3000/tools/workshop?s=sophista-workshop");

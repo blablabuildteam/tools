@@ -171,6 +171,27 @@ body {
     2px 8px 18px rgba(21, 31, 40, 0.16);
 }
 
+.prep-flow .react-flow__edge {
+  cursor: pointer;
+}
+
+.prep-flow .react-flow__edge-path,
+.prep-flow .react-flow__edge-interaction {
+  cursor: pointer;
+}
+
+.prep-flow .react-flow__edge .prep-edge-delete-fo {
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.prep-flow .react-flow__edge:hover .prep-edge-delete-fo {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .workshop-sync-ring {
   transform: rotate(-90deg);
   transform-origin: 14px 14px;

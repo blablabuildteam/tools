@@ -22,7 +22,7 @@ export default function WorkshopSketch({ sessionId, active, reloadToken = 0 }: P
         ref={iframeRef}
         key={`${sessionId}-${reloadToken}`}
         title="Workshop schets"
-        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}&v=prep-18&r=${reloadToken}`}
+        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}&v=prep-21&r=${reloadToken}`}
         className="h-full w-full border-0"
         allow="clipboard-read; clipboard-write"
       />

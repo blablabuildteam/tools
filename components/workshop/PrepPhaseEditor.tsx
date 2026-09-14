@@ -3,6 +3,7 @@
 import {
   addEdge,
   Background,
+  BaseEdge,
   Controls,
   Handle,
   MiniMap,
@@ -10,11 +11,13 @@ import {
   ReactFlow,
   ReactFlowProvider,
   MarkerType,
+  getSmoothStepPath,
   useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
   type Edge,
+  type EdgeProps,
   type Node,
   type NodeProps,
 } from "@xyflow/react";
@@ -40,7 +43,7 @@ import {
 } from "@/lib/workshop-types";
 
 const COL_W = 280;
-const COL_GAP = 20;
+const COL_GAP = 40;
 const ORIGIN_X = 36;
 const ORIGIN_Y = 28;
 const HEADER_H = 168;
@@ -85,6 +88,7 @@ type EditorCtx = {
   addMilestone: () => void;
   patchSticky: (id: string, partial: Partial<PrepSticky>) => void;
   deleteSticky: (id: string) => void;
+  deleteConnection: (id: string) => void;
   hoursByMilestone: Record<PrepMilestoneId, number>;
   aiCountByMilestone: Record<PrepMilestoneId, number>;
   peopleByMilestone: Record<PrepMilestoneId, string[]>;
@@ -886,6 +890,67 @@ function StickyNode({ id, data, selected }: NodeProps<Node<PrepSticky>>) {
   );
 }
 
+function SketchEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style,
+  markerEnd,
+  selected,
+}: EdgeProps) {
+  const { deleteConnection } = useEditor();
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 16,
+  });
+  const btn = 24;
+
+  return (
+    <>
+      <BaseEdge
+        id={id}
+        path={edgePath}
+        markerEnd={markerEnd}
+        interactionWidth={36}
+        style={{
+          ...style,
+          strokeWidth: selected ? 3 : Number(style?.strokeWidth) || 2,
+        }}
+      />
+      <foreignObject
+        width={btn}
+        height={btn}
+        x={labelX - btn / 2}
+        y={labelY - btn / 2}
+        className="prep-edge-delete-fo"
+        requiredExtensions="http://www.w3.org/1999/xhtml"
+      >
+        <button
+          type="button"
+          aria-label="Verbinding verwijderen"
+          className="nodrag nopan flex h-6 w-6 items-center justify-center rounded-full border border-black/10 bg-white text-[#151f28]/55 shadow-sm hover:border-red-300 hover:text-red-600"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteConnection(id);
+          }}
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </foreignObject>
+    </>
+  );
+}
+
 const nodeTypes = {
   lane: LaneNode,
   milestone: MilestoneNode,
@@ -898,21 +963,30 @@ const nodeTypes = {
   sticky: StickyNode,
 };
 
-function toRfEdges(connections: PrepConnection[], steps: PrepStep[]): Edge[] {
+const edgeTypes = {
+  sketch: SketchEdge,
+};
+
+function toRfEdges(connections: PrepConnection[], steps: PrepStep[], prev: Edge[] = []): Edge[] {
   return connections.map((c) => {
     const from = steps.find((s) => s.id === c.source);
     const to = steps.find((s) => s.id === c.target);
     const cross = Boolean(from && to && from.milestoneId !== to.milestoneId);
+    const previous = prev.find((e) => e.id === c.id);
     return {
       id: c.id,
+      type: "sketch",
       source: c.source,
       target: c.target,
       sourceHandle: c.sourceHandle ?? undefined,
       targetHandle: c.targetHandle ?? undefined,
       animated: cross,
+      selected: previous?.selected,
+      deletable: true,
+      interactionWidth: 36,
       style: {
         stroke: cross ? "#1125ff" : "#151f28",
-        strokeWidth: 2,
+        strokeWidth: previous?.selected ? 3 : 2,
         strokeDasharray: cross ? "7 5" : undefined,
       },
       markerEnd: {
@@ -1242,7 +1316,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       setShowAiKansen(showAi);
       setRevealedAiIds(revealed);
 
-      const styled = toRfEdges(connections, steps);
+      const styled = toRfEdges(connections, steps, edgesRef.current);
       edgesRef.current = styled;
       setEdges(styled);
       applyLayout();
@@ -1285,7 +1359,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
 
   useEffect(() => {
     setEdges((eds) => {
-      const styled = toRfEdges(fromRfEdges(eds), stepsRef.current);
+      const styled = toRfEdges(fromRfEdges(eds), stepsRef.current, eds);
       edgesRef.current = styled;
       return styled;
     });
@@ -1495,6 +1569,18 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     [persist]
   );
 
+  const deleteConnection = useCallback(
+    (id: string) => {
+      setEdges((eds) => {
+        const next = eds.filter((e) => e.id !== id);
+        edgesRef.current = next;
+        return next;
+      });
+      persist("connections");
+    },
+    [persist, setEdges]
+  );
+
   const addStickyAt = useCallback(
     (position: { x: number; y: number }) => {
       const n = stickiesRef.current.length;
@@ -1602,6 +1688,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       addMilestone,
       patchSticky,
       deleteSticky,
+      deleteConnection,
     }),
     [
       addAi,
@@ -1609,6 +1696,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       addStep,
       aiCountByMilestone,
       deleteAi,
+      deleteConnection,
       deleteStep,
       deleteSticky,
       hoursByMilestone,
@@ -1633,7 +1721,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
         const dup = eds.some((e) => e.source === connection.source && e.target === connection.target);
         if (dup) return eds;
         const next = addEdge({ ...connection, id: `e-${nanoid(6)}` }, eds);
-        const styled = toRfEdges(fromRfEdges(next), stepsRef.current);
+        const styled = toRfEdges(fromRfEdges(next), stepsRef.current, next);
         edgesRef.current = styled;
         persist("connections");
         return styled;
@@ -1690,7 +1778,8 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
 
   const defaultEdgeOptions = useMemo(
     () => ({
-      type: "smoothstep" as const,
+      type: "sketch" as const,
+      interactionWidth: 36,
       style: { stroke: "#151f28", strokeWidth: 2 },
     }),
     []
@@ -1705,9 +1794,24 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           onNodesChange={onNodesChange}
           onEdgesChange={(chs) => {
             onEdgesChange(chs);
+            const removed = chs.filter((c) => c.type === "remove");
+            if (removed.length) {
+              const ids = new Set(removed.map((c) => c.id));
+              edgesRef.current = edgesRef.current.filter((e) => !ids.has(e.id));
+            }
+            if (removed.length || chs.some((c) => c.type === "add")) {
+              persist("connections");
+            }
+          }}
+          onEdgesDelete={(deleted) => {
+            if (!deleted.length) return;
+            const ids = new Set(deleted.map((e) => e.id));
+            edgesRef.current = edgesRef.current.filter((e) => !ids.has(e.id));
             persist("connections");
           }}
           onConnect={onConnect}
+          onEdgeDoubleClick={(_, edge) => deleteConnection(edge.id)}
+          edgeTypes={edgeTypes}
           onConnectStart={() => {
             flowWrapRef.current?.classList.add("is-connecting");
           }}
@@ -1793,6 +1897,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           }}
           nodeTypes={nodeTypes}
           defaultEdgeOptions={defaultEdgeOptions}
+          elevateEdgesOnSelect
           connectionLineStyle={{ stroke: "#1125ff", strokeWidth: 2 }}
           deleteKeyCode={["Backspace", "Delete"]}
           minZoom={0.28}
@@ -1860,7 +1965,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             {showAiKansen ? "Alle AI-kansen" : "Toon alle AI-kansen"}
           </button>
           <p className="self-center rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[#151f28]/55 ring-1 ring-black/5">
-            Dubbelklik op het bord voor een sticky · Delete verwijdert
+            Dubbelklik op het bord voor een sticky · hover een lijn om te verwijderen
           </p>
         </div>
       </div>
