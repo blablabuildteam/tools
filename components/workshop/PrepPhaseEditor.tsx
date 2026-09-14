@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { AnimatePresence, motion } from "framer-motion";
-import { Building2, Clock, GripVertical, Plus, Sparkles, StickyNote, Trash2, Users, Wrench } from "lucide-react";
+import { Building2, Clock, FaceExpressionless, GripVertical, Plus, Sparkles, StickyNote, Trash2, Users, Wrench } from "lucide-react";
 import { nanoid } from "nanoid";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -588,21 +588,26 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
   const { patchStep, deleteStep } = useEditor();
   const boxRef = useReportHeight(id);
   const hasParty = asChipList(data.parties).length > 0;
+  const isPain = data.painPoint === true;
   const { leaving, exit } = useExitThen(() => deleteStep(id));
 
   return (
     <div ref={boxRef} className="prep-pop-in w-[252px]">
     <div
-      className={`prep-card rounded-xl border-2 bg-white px-3 py-2.5 shadow-sm ${
+      className={`prep-card rounded-xl border-2 px-3 py-2.5 shadow-sm ${
         leaving ? "is-leaving" : ""
-      } ${
+      } ${isPain ? "bg-[#fff4f0]" : "bg-white"} ${
         hasParty
           ? selected
             ? "border-orange-500 ring-2 ring-orange-400/40"
             : "border-orange-400"
-          : selected
-            ? "border-[#1125ff]/50 ring-2 ring-[#1125ff]/20"
-            : "border-black/10"
+          : isPain
+            ? selected
+              ? "border-rose-400 ring-2 ring-rose-300/40"
+              : "border-rose-300"
+            : selected
+              ? "border-[#1125ff]/50 ring-2 ring-[#1125ff]/20"
+              : "border-black/10"
       }`}
     >
       <Handle type="target" position={Position.Left} id="l" className={handleClass("target")} />
@@ -626,8 +631,25 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         />
         <button
           type="button"
+          aria-pressed={isPain}
+          aria-label={isPain ? "Pijnpunt verwijderen" : "Markeer als pijnpunt"}
+          title={isPain ? "Pijnpunt — klik om te verwijderen" : "Markeer als pijnpunt"}
+          onClick={(e) => {
+            e.stopPropagation();
+            patchStep(id, { painPoint: !isPain });
+          }}
+          className={`nodrag rounded p-0.5 ${
+            isPain
+              ? "text-rose-600 hover:text-rose-700"
+              : "text-[#151f28]/25 hover:text-[#151f28]/70"
+          }`}
+        >
+          <FaceExpressionless className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
           onClick={exit}
-          className="nodrag rounded p-0.5 text-[#151f28]/25 hover:text-red-500"
+          className="step-trash nodrag rounded p-0.5 text-[#151f28]/25 hover:text-red-500"
           aria-label="Stap verwijderen"
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -1370,6 +1392,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             people: [],
             parties: [],
             tools: [],
+            painPoint: false,
             order,
           },
         ];
@@ -1784,7 +1807,10 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             className="!rounded-xl !border !border-black/10 !bg-white/90"
             nodeColor={(n) => {
               if (n.type === "prep-step") {
-                return asChipList((n.data as PrepStep).parties).length ? "#f97316" : "#1125ff";
+                const step = n.data as PrepStep;
+                if (asChipList(step.parties).length) return "#f97316";
+                if (step.painPoint) return "#f43f5e";
+                return "#1125ff";
               }
               if (n.type === "milestone") return "#151f28";
               if (n.type === "ai-idea") return "#ceff00";
