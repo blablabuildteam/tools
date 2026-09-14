@@ -554,7 +554,7 @@ export default function WorkshopTool() {
           <div className="border-b border-white/8 px-5 py-3 sm:px-6">
             <p className="text-sm font-semibold text-white">Notities naast de schets</p>
             <p className="text-[12px] text-white/40">
-              Drie kolommen — geen procesplaat. Schets blijft de hoofdzaak.
+              Drie kolommen — geen procesplaat. Schets blijft de Voorbereidingsfase.
             </p>
           </div>
           <WorkshopBoard

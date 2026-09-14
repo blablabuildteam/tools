@@ -1,10 +1,13 @@
 "use client";
 
 import {
+  PREP_MILESTONES,
   SOPHISTA_AI_DIRECTIONS,
   SOPHISTA_IM_STRUCTURE,
   SOPHISTA_LATER_PHASES,
 } from "@/lib/workshop-types";
+
+const MILESTONE_LABEL = Object.fromEntries(PREP_MILESTONES.map((m) => [m.id, m.short]));
 
 export default function WorkshopReferenceView() {
   return (
@@ -15,8 +18,9 @@ export default function WorkshopReferenceView() {
         </p>
         <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">AI-richtingen</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/50">
-          Terugblik uit hun AI-toepassingen (voorbereidingsfase). Gebruik dit om snel te
-          prioriteren — scope vandaag blijft info verzamelen → eerste gestandaardiseerde output.
+          Hun eigen AI-toepassingen op de voorbereidingsfase. Dezelfde kaarten staan op de
+          Schets, bovenop de milestones — daar kun je ze aanvullen en extra oplossingen
+          toevoegen.
         </p>
 
         <div className="mt-8 grid gap-4">
@@ -32,6 +36,9 @@ export default function WorkshopReferenceView() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-[10px] uppercase tracking-wider text-white/35">
                   {uc.phase}
+                </span>
+                <span className="rounded-full bg-white/8 px-2 py-0.5 font-mono text-[10px] text-white/55">
+                  {MILESTONE_LABEL[uc.milestoneId] ?? uc.milestoneId}
                 </span>
                 {uc.inScopeToday ? (
                   <span className="rounded-full bg-[#ceff00]/15 px-2 py-0.5 text-[10px] font-semibold text-[#ceff00]">

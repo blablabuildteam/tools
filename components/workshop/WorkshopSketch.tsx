@@ -8,7 +8,7 @@ type Props = {
 };
 
 /**
- * Schets tab embeds an isolated draw frame (Excalidraw).
+ * Schets tab embeds an isolated Voorbereidingsfase board (React Flow).
  * Kept in an iframe so workshop React updates cannot destroy the canvas.
  */
 export default function WorkshopSketch({ sessionId, active }: Props) {
@@ -21,7 +21,7 @@ export default function WorkshopSketch({ sessionId, active }: Props) {
       <iframe
         ref={iframeRef}
         title="Workshop schets"
-        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}`}
+        src={`/tools/workshop/draw?s=${encodeURIComponent(sessionId)}&v=prep-13`}
         className="h-full w-full border-0"
         allow="clipboard-read; clipboard-write"
       />

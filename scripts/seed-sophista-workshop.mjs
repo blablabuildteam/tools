@@ -1,5 +1,6 @@
 /**
- * Reset Sophista schets to Excalidraw format (client seeds default flowchart if empty).
+ * Reset Sophista schets to the Voorbereidingsfase milestone board.
+ * Source docs: docs/sophista/ (company deck, AI-toepassingen, IM-prompt).
  * Run: node scripts/seed-sophista-workshop.mjs
  */
 import { readFileSync } from "fs";
@@ -64,11 +65,9 @@ if (typeof existingRaw === "string") {
   }
 }
 
-// Keep existing Excalidraw edits; otherwise empty scene → client builds default flowchart
-const keepExcalidraw =
-  existing?.sketch?.type === "excalidraw" &&
-  Array.isArray(existing.sketch.elements) &&
-  existing.sketch.elements.length > 0;
+// Never clobber the live Vercel flowchart unless explicitly requested.
+const resetSketch = process.argv.includes("--reset-sketch");
+const keepSketch = !resetSketch && Boolean(existing?.sketch);
 
 const session = {
   meta: {
@@ -157,14 +156,69 @@ const session = {
           0
         ),
       ],
-  sketch: keepExcalidraw
+  sketch: keepSketch
     ? existing.sketch
     : {
-        type: "excalidraw",
-        version: 2,
-        elements: [],
-        appState: { viewBackgroundColor: "#f7f6f2" },
-        files: {},
+        type: "prep-phase-v1",
+        steps: [],
+        connections: [],
+        aiIdeas: [
+          {
+            id: "uc1",
+            milestoneId: "strategie",
+            title: "Bedrijfsverkenning",
+            body: "Met één druk een uitgebreide analyse van een onderneming: omschrijving, historie, producten, geografie, klanten, USP’s, ketenpositie, eigenaars, financiële kengetallen, overnamegeschiedenis.",
+            sources: "Company.info · Gain.pro · LongListMaker · publieke bronnen",
+            known: true,
+            order: 0,
+          },
+          {
+            id: "uc2",
+            milestoneId: "strategie",
+            title: "Marktanalyse",
+            body: "Marktbeeld op knop: trends, regelgeving, groei & drijvers, ketenvisual, concurrenten, marktaandeel, fragmentatie vs. consolidatie.",
+            sources: "Publieke + gelicentieerde marktdata",
+            known: true,
+            order: 1,
+          },
+          {
+            id: "uc3",
+            milestoneId: "im",
+            title: "Informatiememorandum (IM)",
+            body: "Map met klantgegevens + notulen woord-voor-woord analyseren, aanvullen met eigen analyse en eerdere IMs, stap-voor-stap met controle → investeerdergericht deck.",
+            sources: "Klantdossier · notulen · kennisbank / eerdere IMs",
+            known: true,
+            order: 0,
+          },
+          {
+            id: "uc4",
+            milestoneId: "nda",
+            title: "NDA personaliseren",
+            body: "Standaard NDA automatisch personaliseren (aanhef) op basis van Company.info; tekeningsbevoegde moet tekenen.",
+            sources: "Company.info · NDA-template",
+            known: true,
+            order: 0,
+          },
+          {
+            id: "uc5",
+            milestoneId: "teaser",
+            title: "Teaser / anoniem profiel",
+            body: "Op basis van het IM automatisch een teaser of anoniem profiel genereren.",
+            sources: "IM-output",
+            known: true,
+            order: 0,
+          },
+          {
+            id: "uc6",
+            milestoneId: "longlist",
+            title: "Longlist kopers",
+            body: "Longlist met categorieën (NL/Benelux/EU/wereld), koppeling Gain.pro / Longlistmaker / Company.info + bedrijfsverkenning-agent → dashboard + Excel.",
+            sources: "Gain.pro · Longlistmaker · Company.info",
+            known: true,
+            order: 0,
+          },
+        ],
+        stickies: [],
       },
 };
 
@@ -172,8 +226,9 @@ await redis("SET", KEY, JSON.stringify(session));
 await redis("EXPIRE", KEY, String(TTL));
 
 console.log(
-  keepExcalidraw
-    ? "Kept existing Excalidraw scene"
-    : "Reset schets → client will seed default flowchart"
+  keepSketch
+    ? `Kept existing schets (${existing.sketch?.type || "unknown"})`
+    : "Reset schets → empty Voorbereidingsfase milestones"
 );
 console.log("URL: https://tools.blablabuild.com/tools/workshop?s=sophista-workshop");
+console.log("Local: http://localhost:3000/tools/workshop?s=sophista-workshop");
