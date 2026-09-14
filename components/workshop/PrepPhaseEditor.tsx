@@ -15,6 +15,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useStore,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -23,7 +24,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { animate, AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Building2, Clock, FaceExpressionless, FileType, GripVertical, Minus, Plus, Scan, Sparkles, StickyNote, Trash2, Users, Wrench } from "lucide-react";
+import { Building2, Clock, FaceExpressionless, FileType, GripVertical, Info, Minus, Plus, Redo2, Scan, Sparkles, StickyNote, Trash2, Undo2, Users, Wrench } from "lucide-react";
 import { nanoid } from "nanoid";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -31,6 +32,7 @@ import {
   createDefaultPrepMilestones,
   normalizePrepStep,
   sketchFingerprint,
+  SKETCH_PATCH_KEYS,
   STICKY_COLORS,
   type PrepAiIdea,
   type PrepConnection,
@@ -59,6 +61,11 @@ const AI_GAP = 10;
 const ADD_AI_H = 36;
 const REVEAL_H = 52;
 const STICKY_W = 176;
+const STICKY_H = 132;
+const ADD_MILESTONE_W = 260;
+const ADD_MILESTONE_H = 118;
+const MILESTONE_W = 260;
+const BOARD_BG = "#f3f1eb";
 
 const LANE_COLORS = [
   "rgba(206, 255, 0, 0.09)",
@@ -82,6 +89,38 @@ const LANE_COLORS = [
 function laneBackground(index: number) {
   const i = Number.isFinite(index) && index >= 0 ? index : 0;
   return LANE_COLORS[i % LANE_COLORS.length];
+}
+
+function laneMinimapColor(index: number) {
+  const src = laneBackground(index);
+  const m = src.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+  if (!m) return "#e7e4dc";
+  const r = Number(m[1]);
+  const g = Number(m[2]);
+  const b = Number(m[3]);
+  const a = Math.min(0.32, Number(m[4]) * 3.2);
+  const mix = (c: number, base: number) => Math.round(c * a + base * (1 - a));
+  return `rgb(${mix(r, 243)}, ${mix(g, 241)}, ${mix(b, 235)})`;
+}
+
+/** Declared size so MiniMap can draw nodes before/without measured bounds. */
+function flowSize(width: number, height: number, style: Node["style"] = {}) {
+  return {
+    width,
+    initialWidth: width,
+    initialHeight: height,
+    style: { ...style, width },
+  };
+}
+
+function flowBox(width: number, height: number, style: Node["style"] = {}) {
+  return {
+    width,
+    height,
+    initialWidth: width,
+    initialHeight: height,
+    style: { ...style, width, height },
+  };
 }
 
 type LaneData = { index: number };
@@ -313,15 +352,16 @@ function layoutNodes(
     let y = columnContentY(heights, m.id);
 
     col.forEach((step) => {
+      const stepH = measured(heights, step.id, STEP_H);
       columnNodes.push({
         id: step.id,
         type: "prep-step",
         position: { x, y },
         data: step,
         dragHandle: ".step-drag",
-        style: { zIndex: 2, width: STEP_W },
+        ...flowSize(STEP_W, stepH, { zIndex: 2 }),
       });
-      y += measured(heights, step.id, STEP_H) + STEP_GAP;
+      y += stepH + STEP_GAP;
     });
     columnNodes.push({
       id: `add-${m.id}`,
@@ -331,7 +371,7 @@ function layoutNodes(
       draggable: false,
       selectable: true,
       connectable: false,
-      style: { zIndex: 4, width: STEP_W, height: ADD_H },
+      ...flowBox(STEP_W, ADD_H, { zIndex: 4 }),
     });
     y += ADD_H + 8;
     const aiOpen = isAiOpen(m.id, showAiKansen, revealedIds);
@@ -343,20 +383,21 @@ function layoutNodes(
       draggable: false,
       selectable: true,
       connectable: false,
-      style: { zIndex: 4, width: STEP_W, height: REVEAL_H },
+      ...flowBox(STEP_W, REVEAL_H, { zIndex: 4 }),
     });
     y += REVEAL_H + (aiOpen ? 8 : LANE_PAD);
     if (aiOpen) {
       ideas.forEach((idea) => {
+        const ideaH = measured(heights, idea.id, AI_H);
         columnNodes.push({
           id: idea.id,
           type: "ai-idea",
           position: { x, y },
           data: idea,
           dragHandle: ".ai-drag",
-          style: { zIndex: 3, width: STEP_W },
+          ...flowSize(STEP_W, ideaH, { zIndex: 3 }),
         });
-        y += measured(heights, idea.id, AI_H) + AI_GAP;
+        y += ideaH + AI_GAP;
       });
       columnNodes.push({
         id: `add-ai-${m.id}`,
@@ -366,7 +407,7 @@ function layoutNodes(
         draggable: false,
         selectable: true,
         connectable: false,
-        style: { zIndex: 4, width: STEP_W, height: ADD_AI_H },
+        ...flowBox(STEP_W, ADD_AI_H, { zIndex: 4 }),
       });
       y += ADD_AI_H + LANE_PAD;
     }
@@ -382,15 +423,11 @@ function layoutNodes(
       connectable: false,
       focusable: false,
       className: "nopan",
-      width: COL_W,
-      height,
-      style: {
-        width: COL_W,
-        height,
+      ...flowBox(COL_W, height, {
         zIndex: 0,
         pointerEvents: "none",
         borderRadius: 16,
-      },
+      }),
     });
     nodes.push({
       id: `ms-${m.id}`,
@@ -399,7 +436,7 @@ function layoutNodes(
       data: { ...m, index: i },
       dragHandle: ".ms-drag",
       connectable: false,
-      style: { zIndex: 5, width: 260 },
+      ...flowSize(MILESTONE_W, measured(heights, `ms-${m.id}`, HEADER_H - 18), { zIndex: 5 }),
     });
     nodes.push(...columnNodes);
   });
@@ -415,14 +452,10 @@ function layoutNodes(
       connectable: false,
       focusable: false,
       className: "nopan",
-      width: bandW,
-      height: HOURS_BAND_H,
-      style: {
-        width: bandW,
-        height: HOURS_BAND_H,
+      ...flowBox(bandW, HOURS_BAND_H, {
         zIndex: 6,
         pointerEvents: "none",
-      },
+      }),
     });
   }
   nodes.push({
@@ -434,7 +467,7 @@ function layoutNodes(
     selectable: true,
     connectable: false,
     className: "nopan",
-    style: { zIndex: 5, width: COL_W },
+    ...flowBox(ADD_MILESTONE_W, ADD_MILESTONE_H, { zIndex: 5 }),
   });
   for (const sticky of stickies) {
     nodes.push({
@@ -443,7 +476,7 @@ function layoutNodes(
       position: { x: sticky.x, y: sticky.y },
       data: sticky,
       connectable: false,
-      style: { zIndex: 8, width: STICKY_W },
+      ...flowSize(STICKY_W, measured(heights, sticky.id, STICKY_H), { zIndex: 8 }),
     });
   }
   return nodes;
@@ -1220,10 +1253,11 @@ function stickyTilt(id: string) {
 function StickyNode({ id, data, selected }: NodeProps<Node<PrepSticky>>) {
   const { patchSticky, deleteSticky } = useEditor();
   const { leaving, exit } = useExitThen(() => deleteSticky(id));
+  const boxRef = useReportHeight(id);
   const tilt = stickyTilt(id);
 
   return (
-    <div className="prep-pop-in w-[176px]">
+    <div ref={boxRef} className="prep-pop-in w-[176px]">
       <div
         className={`prep-sticky-paper prep-card relative rounded-[2px] px-2.5 pb-2 pt-2 ${
           leaving ? "is-leaving" : ""
@@ -1399,6 +1433,13 @@ function fromRfEdges(edges: Edge[]): PrepConnection[] {
   }));
 }
 
+const HISTORY_LIMIT = 50;
+const COALESCE_MS = 800;
+
+function cloneSketch(doc: PrepPhaseSketch): PrepPhaseSketch {
+  return structuredClone(doc);
+}
+
 function reindexColumn<T extends { milestoneId: PrepMilestoneId; order: number }>(
   items: T[],
   milestoneId: PrepMilestoneId
@@ -1532,6 +1573,79 @@ type Props = {
   onSave: (doc: PrepPhaseSketch, touched: SketchPatchKey[]) => void;
 };
 
+function minimapNodeColor(n: Node) {
+  if (n.type === "lane") return laneMinimapColor((n.data as LaneData).index);
+  if (n.type === "hours-band" || n.type === "milestone") return "#151f28";
+  if (n.type === "prep-step") {
+    const step = n.data as PrepStep;
+    if (asChipList(step.parties).length) return "#fff7ed";
+    if (step.painPoint) return "#fff4f0";
+    return "#ffffff";
+  }
+  if (n.type === "ai-idea") return "#f3ff9a";
+  if (n.type === "sticky") return (n.data as PrepSticky).color || "#FDE047";
+  if (n.type === "reveal-ai") return (n.data as RevealData).open ? "#ffffff" : "#ceff00";
+  if (n.type === "add-ai") return "rgba(206, 255, 0, 0.35)";
+  if (n.type === "add-step" || n.type === "add-milestone") return "#ffffff";
+  return "transparent";
+}
+
+function minimapNodeStroke(n: Node) {
+  if (n.type === "prep-step") {
+    const step = n.data as PrepStep;
+    if (asChipList(step.parties).length) return "#fb923c";
+    if (step.painPoint) return "#fda4af";
+    return "rgba(21, 31, 40, 0.16)";
+  }
+  if (n.type === "ai-idea") return "rgba(206, 255, 0, 0.9)";
+  if (n.type === "sticky") return "rgba(21, 31, 40, 0.12)";
+  if (n.type === "add-step" || n.type === "add-milestone" || n.type === "add-ai") {
+    return "rgba(21, 31, 40, 0.22)";
+  }
+  if (n.type === "reveal-ai") return "rgba(21, 31, 40, 0.12)";
+  return "rgba(21, 31, 40, 0.08)";
+}
+
+function SketchMiniMap() {
+  const paneW = useStore((s) => s.width);
+  const paneH = useStore((s) => s.height);
+  const aspect = paneW > 1 && paneH > 1 ? paneW / paneH : 16 / 9;
+  const height = 112;
+  const width = Math.round(Math.min(340, Math.max(168, height * aspect)));
+
+  return (
+    <MiniMap
+      pannable
+      zoomable
+      ariaLabel="Overzicht van de schets"
+      offsetScale={2}
+      bgColor={BOARD_BG}
+      maskColor="rgba(21, 31, 40, 0.22)"
+      maskStrokeColor="#1125ff"
+      maskStrokeWidth={1.5}
+      nodeBorderRadius={6}
+      nodeColor={minimapNodeColor}
+      nodeStrokeColor={minimapNodeStroke}
+      style={{ width, height }}
+      className="!bottom-3 !right-3 !m-0 !rounded-xl !bg-[#f3f1eb] !shadow-lg"
+    />
+  );
+}
+
+function carryNodeState(next: Node[], prev: Node[], draggingId: string | null): Node[] {
+  const prevById = new Map(prev.map((n) => [n.id, n]));
+  return next.map((n) => {
+    const old = prevById.get(n.id);
+    if (!old) return n;
+    return {
+      ...n,
+      measured: old.measured,
+      selected: old.selected,
+      position: draggingId === n.id ? old.position : n.position,
+    };
+  });
+}
+
 function FlowCanvas({ initial, remote, onSave }: Props) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const fitToScreen = useCallback(() => {
@@ -1578,6 +1692,16 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
   const heightsRef = useRef<Record<string, number>>({});
   const pendingStickyFocus = useRef<string | null>(null);
   const firstSketchActive = useRef(true);
+  const historyRef = useRef<{ past: PrepPhaseSketch[]; future: PrepPhaseSketch[] }>({
+    past: [],
+    future: [],
+  });
+  const coalesceRef = useRef<{ key: string; at: number } | null>(null);
+  const skipHistory = useRef(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [showSketchTips, setShowSketchTips] = useState(false);
+  const tipsRef = useRef<HTMLDivElement>(null);
   const [heightRev, setHeightRev] = useState(0);
   stepsRef.current = stepList;
   aiRef.current = aiList;
@@ -1625,6 +1749,46 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     }, 400);
   }, [onSave]);
 
+  const snapshotFromRefs = useCallback((): PrepPhaseSketch => {
+    return {
+      type: "prep-phase-v1",
+      steps: stepsRef.current,
+      connections: fromRfEdges(edgesRef.current),
+      aiIdeas: aiRef.current,
+      milestones: milestonesRef.current,
+      stickies: stickiesRef.current,
+      showAiKansen: showAiRef.current,
+      revealedAiMilestoneIds: revealedAiRef.current,
+    };
+  }, []);
+
+  const pushHistory = useCallback(
+    (coalesceKey?: string) => {
+      if (skipHistory.current) return;
+      const now = Date.now();
+      if (
+        coalesceKey &&
+        coalesceRef.current &&
+        coalesceRef.current.key === coalesceKey &&
+        now - coalesceRef.current.at < COALESCE_MS
+      ) {
+        coalesceRef.current.at = now;
+        return;
+      }
+      coalesceRef.current = coalesceKey ? { key: coalesceKey, at: now } : null;
+      const snap = cloneSketch(snapshotFromRefs());
+      const past = historyRef.current.past;
+      const last = past[past.length - 1];
+      if (last && sketchFingerprint(last) === sketchFingerprint(snap)) return;
+      past.push(snap);
+      if (past.length > HISTORY_LIMIT) past.shift();
+      historyRef.current.future = [];
+      setCanUndo(true);
+      setCanRedo(false);
+    },
+    [snapshotFromRefs]
+  );
+
   useEffect(() => {
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return;
@@ -1670,19 +1834,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       revealedAiRef.current
     );
     const id = dragId.current;
-    if (!dragging.current || !id) {
-      setNodes(laidOut);
-      return;
-    }
-    setNodes((prev) => {
-      const current = prev.find((n) => n.id === id);
-      return laidOut.map((n) => (n.id === id && current ? { ...n, position: current.position } : n));
-    });
+    setNodes((prev) => carryNodeState(laidOut, prev, dragging.current && id ? id : null));
   }, [setNodes]);
 
   const applyDoc = useCallback(
-    (doc: PrepPhaseSketch) => {
-      const skip = dirtyKeys.current;
+    (doc: PrepPhaseSketch, opts?: { force?: boolean }) => {
+      const skip = opts?.force ? new Set<SketchPatchKey>() : dirtyKeys.current;
       const steps = skip.has("steps") ? stepsRef.current : doc.steps.map(normalizePrepStep);
       const ai = skip.has("aiIdeas") ? aiRef.current : (doc.aiIdeas ?? []);
       const miles = skip.has("milestones")
@@ -1717,6 +1874,76 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     [applyLayout, setEdges]
   );
 
+  const restoreSketch = useCallback(
+    (doc: PrepPhaseSketch) => {
+      skipHistory.current = true;
+      applyDoc(doc, { force: true });
+      persist(...SKETCH_PATCH_KEYS);
+      skipHistory.current = false;
+    },
+    [applyDoc, persist]
+  );
+
+  const undoSketch = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (!past.length) return;
+    coalesceRef.current = null;
+    const current = cloneSketch(snapshotFromRefs());
+    const prev = past.pop()!;
+    future.push(current);
+    restoreSketch(prev);
+    setCanUndo(past.length > 0);
+    setCanRedo(true);
+    if (statusRef.current) statusRef.current.textContent = "Ongedaan gemaakt";
+  }, [restoreSketch, snapshotFromRefs]);
+
+  const redoSketch = useCallback(() => {
+    const { past, future } = historyRef.current;
+    if (!future.length) return;
+    coalesceRef.current = null;
+    const current = cloneSketch(snapshotFromRefs());
+    const next = future.pop()!;
+    past.push(current);
+    restoreSketch(next);
+    setCanUndo(true);
+    setCanRedo(future.length > 0);
+    if (statusRef.current) statusRef.current.textContent = "Opnieuw toegepast";
+  }, [restoreSketch, snapshotFromRefs]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.isComposing) return;
+      const mod = event.metaKey || event.ctrlKey;
+      if (!mod) return;
+      const key = event.key.toLowerCase();
+      if (key !== "z" && key !== "y") return;
+      const wantRedo = (key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey);
+      event.preventDefault();
+      event.stopPropagation();
+      if (wantRedo) redoSketch();
+      else undoSketch();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [redoSketch, undoSketch]);
+
+  useEffect(() => {
+    if (!showSketchTips) return;
+    function onPointerDown(event: PointerEvent) {
+      if (tipsRef.current?.contains(event.target as Node)) return;
+      setShowSketchTips(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowSketchTips(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showSketchTips]);
+
   useEffect(() => {
     if (!remote) return;
     if (dragging.current) return;
@@ -1731,7 +1958,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       revealedAiMilestoneIds: revealedAiRef.current,
     };
     if (sketchFingerprint(remote) === sketchFingerprint(local)) return;
+    if (dirtyKeys.current.size > 0) return;
     applyDoc(remote);
+    historyRef.current = { past: [], future: [] };
+    coalesceRef.current = null;
+    setCanUndo(false);
+    setCanRedo(false);
   }, [applyDoc, remote]);
 
   useEffect(() => {
@@ -1762,13 +1994,13 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     ready.current = true;
     const t = window.setTimeout(() => {
       fitView({ padding: 0.08, duration: 240 });
-      if (statusRef.current) statusRef.current.textContent = "Sleep bolletjes om te verbinden";
     }, 120);
     return () => window.clearTimeout(t);
   }, [fitView]);
 
   const patchStep = useCallback(
     (id: string, partial: Partial<PrepStep>) => {
+      pushHistory(`step:${id}:${Object.keys(partial).sort().join(",")}`);
       setStepList((prev) => {
         const next = prev.map((s) => (s.id === id ? { ...s, ...partial } : s));
         stepsRef.current = next;
@@ -1783,11 +2015,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       );
       persist("steps");
     },
-    [persist, setNodes]
+    [persist, pushHistory, setNodes]
   );
 
   const patchAi = useCallback(
     (id: string, partial: Partial<PrepAiIdea>) => {
+      pushHistory(`ai:${id}:${Object.keys(partial).sort().join(",")}`);
       setAiList((prev) => {
         const next = prev.map((s) => (s.id === id ? { ...s, ...partial } : s));
         aiRef.current = next;
@@ -1802,11 +2035,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       );
       persist("aiIdeas");
     },
-    [persist, setNodes]
+    [persist, pushHistory, setNodes]
   );
 
   const deleteStep = useCallback(
     (id: string) => {
+      pushHistory();
       setStepList((prev) => {
         const gone = prev.find((s) => s.id === id);
         if (!gone) return prev;
@@ -1824,11 +2058,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("steps", "connections");
     },
-    [persist, setEdges]
+    [persist, pushHistory, setEdges]
   );
 
   const deleteAi = useCallback(
     (id: string) => {
+      pushHistory();
       setAiList((prev) => {
         const gone = prev.find((s) => s.id === id);
         if (!gone) return prev;
@@ -1841,11 +2076,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("aiIdeas");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const addStep = useCallback(
     (milestoneId: PrepMilestoneId) => {
+      pushHistory();
       setStepList((prev) => {
         const order = prev.filter((s) => s.milestoneId === milestoneId).length;
         const next = [
@@ -1869,11 +2105,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("steps");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const addAi = useCallback(
     (milestoneId: PrepMilestoneId) => {
+      pushHistory();
       setAiList((prev) => {
         const order = prev.filter((s) => s.milestoneId === milestoneId).length;
         const next = [
@@ -1893,11 +2130,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("aiIdeas");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const patchMilestone = useCallback(
     (id: string, partial: Partial<PrepMilestone>) => {
+      pushHistory(`milestone:${id}:${Object.keys(partial).sort().join(",")}`);
       setMilestones((prev) => {
         const next = prev.map((m) => (m.id === id ? { ...m, ...partial } : m));
         milestonesRef.current = next;
@@ -1912,10 +2150,11 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       );
       persist("milestones");
     },
-    [persist, setNodes]
+    [persist, pushHistory, setNodes]
   );
 
   const addMilestone = useCallback(() => {
+    pushHistory();
     setMilestones((prev) => {
       const next = [
         ...prev,
@@ -1930,10 +2169,11 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       return next;
     });
     persist("milestones");
-  }, [persist]);
+  }, [persist, pushHistory]);
 
   const patchSticky = useCallback(
     (id: string, partial: Partial<PrepSticky>) => {
+      pushHistory(`sticky:${id}:${Object.keys(partial).sort().join(",")}`);
       setStickyList((prev) => {
         const next = prev.map((s) => (s.id === id ? { ...s, ...partial } : s));
         stickiesRef.current = next;
@@ -1948,11 +2188,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       );
       persist("stickies");
     },
-    [persist, setNodes]
+    [persist, pushHistory, setNodes]
   );
 
   const deleteSticky = useCallback(
     (id: string) => {
+      pushHistory();
       setStickyList((prev) => {
         const next = prev.filter((s) => s.id !== id);
         stickiesRef.current = next;
@@ -1960,11 +2201,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("stickies");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const deleteConnection = useCallback(
     (id: string) => {
+      pushHistory("connections");
       setEdges((eds) => {
         const next = eds.filter((e) => e.id !== id);
         edgesRef.current = next;
@@ -1972,11 +2214,12 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("connections");
     },
-    [persist, setEdges]
+    [persist, pushHistory, setEdges]
   );
 
   const addStickyAt = useCallback(
     (position: { x: number; y: number }) => {
+      pushHistory();
       const n = stickiesRef.current.length;
       const sticky: PrepSticky = {
         id: `sk-${nanoid(8)}`,
@@ -1993,7 +2236,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       });
       persist("stickies");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const addStickyInView = useCallback(() => {
@@ -2069,6 +2312,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
 
   const toggleAiColumn = useCallback(
     (milestoneId: PrepMilestoneId) => {
+      pushHistory(`ai-col:${milestoneId}`);
       if (showAiRef.current) {
         showAiRef.current = false;
         setShowAiKansen(false);
@@ -2086,7 +2330,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       }
       persist("showAiKansen", "revealedAiMilestoneIds");
     },
-    [persist]
+    [persist, pushHistory]
   );
 
   const ctx = useMemo<EditorCtx>(
@@ -2145,6 +2389,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!connection.source || !connection.target || connection.source === connection.target) return;
+      pushHistory("connections");
       setEdges((eds) => {
         const dup = eds.some((e) => e.source === connection.source && e.target === connection.target);
         if (dup) return eds;
@@ -2155,7 +2400,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
         return styled;
       });
     },
-    [persist, setEdges]
+    [persist, pushHistory, setEdges]
   );
 
   const previewDrag = useCallback((node: Node, shouldPersist: boolean) => {
@@ -2221,6 +2466,9 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={(chs) => {
+            if (chs.some((c) => c.type === "remove" || c.type === "add")) {
+              pushHistory("connections");
+            }
             onEdgesChange(chs);
             const removed = chs.filter((c) => c.type === "remove");
             if (removed.length) {
@@ -2233,6 +2481,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           }}
           onEdgesDelete={(deleted) => {
             if (!deleted.length) return;
+            pushHistory("connections");
             const ids = new Set(deleted.map((e) => e.id));
             edgesRef.current = edgesRef.current.filter((e) => !ids.has(e.id));
             persist("connections");
@@ -2285,6 +2534,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
               node.type === "milestone" ||
               node.type === "sticky"
             ) {
+              pushHistory();
               dragging.current = true;
               flowWrapRef.current?.classList.add("is-dragging");
               dragId.current = node.id;
@@ -2338,33 +2588,16 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           proOptions={{ hideAttribution: true }}
         >
           <Background gap={20} color="#d9d5cd" />
-          <MiniMap
-            pannable
-            zoomable
-            className="!rounded-xl !border !border-black/10 !bg-white/90"
-            nodeColor={(n) => {
-              if (n.type === "prep-step") {
-                const step = n.data as PrepStep;
-                if (asChipList(step.parties).length) return "#f97316";
-                if (step.painPoint) return "#f43f5e";
-                return "#1125ff";
-              }
-              if (n.type === "milestone") return "#151f28";
-              if (n.type === "hours-band") return "#151f28";
-              if (n.type === "ai-idea") return "#ceff00";
-              if (n.type === "sticky") return (n.data as PrepSticky).color || "#FDE047";
-              return "#d6d3cd";
-            }}
-          />
+          <SketchMiniMap />
         </ReactFlow>
 
         <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
           <div className="rounded-full bg-[#151f28] px-3 py-1.5 text-[11px] text-white shadow-lg">
             <span className="font-medium">Voorbereidingsfase</span>
-            <span className="mx-2 text-white/25">|</span>
-            <span ref={statusRef} className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00]">
-              …
-            </span>
+            <span
+              ref={statusRef}
+              className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00] empty:hidden before:mx-2 before:text-white/25 before:content-['|']"
+            />
           </div>
           <button
             type="button"
@@ -2383,6 +2616,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           <button
             type="button"
             onClick={() => {
+              pushHistory("show-ai");
               const next = !showAiRef.current;
               showAiRef.current = next;
               setShowAiKansen(next);
@@ -2397,13 +2631,31 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             <Sparkles className="h-3.5 w-3.5" />
             {showAiKansen ? "Alle AI-kansen" : "Toon alle AI-kansen"}
           </button>
-          <p className="self-center rounded-full bg-white/90 px-3 py-1.5 text-[11px] text-[#151f28]/55 ring-1 ring-black/5">
-            Dubbelklik op het bord voor een sticky · hover een lijn om te verwijderen
-          </p>
         </div>
 
-        <div className="pointer-events-none absolute bottom-3 left-3 z-20">
+        <div ref={tipsRef} className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-end gap-2">
           <div className="pointer-events-auto flex flex-col overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/10">
+            <button
+              type="button"
+              aria-label="Ongedaan maken"
+              title="Ongedaan maken (⌘Z)"
+              disabled={!canUndo}
+              onClick={undoSketch}
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-30"
+            >
+              <Undo2 className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              aria-label="Opnieuw"
+              title="Opnieuw (⌘⇧Z)"
+              disabled={!canRedo}
+              onClick={redoSketch}
+              className="flex h-9 w-9 items-center justify-center text-[#151f28] transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none disabled:pointer-events-none disabled:opacity-30"
+            >
+              <Redo2 className="h-4 w-4" strokeWidth={2.25} />
+            </button>
+            <div className="mx-2 h-px bg-black/10" />
             <button
               type="button"
               aria-label="Inzoomen"
@@ -2429,7 +2681,37 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
             >
               <Scan className="h-4 w-4" strokeWidth={2.25} />
             </button>
+            <div className="mx-2 h-px bg-black/10" />
+            <button
+              type="button"
+              aria-label="Tips"
+              aria-expanded={showSketchTips}
+              aria-controls="sketch-tips"
+              title="Tips"
+              onClick={() => setShowSketchTips((open) => !open)}
+              className={`flex h-9 w-9 items-center justify-center transition-colors hover:bg-black/[0.05] focus-visible:bg-black/[0.05] focus-visible:outline-none ${
+                showSketchTips ? "bg-black/[0.06] text-[#151f28]" : "text-[#151f28]"
+              }`}
+            >
+              <Info className="h-4 w-4" strokeWidth={2.25} />
+            </button>
           </div>
+          {showSketchTips ? (
+            <div
+              id="sketch-tips"
+              role="note"
+              className="pointer-events-auto w-[228px] rounded-xl bg-white px-3 py-2.5 text-[11px] leading-relaxed text-[#151f28]/75 shadow-lg ring-1 ring-black/10"
+            >
+              <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/40">
+                Tips
+              </p>
+              <ul className="space-y-1.5">
+                <li>Sleep bolletjes om te verbinden</li>
+                <li>Dubbelklik op het bord voor een sticky</li>
+                <li>⌘Z ongedaan maken · ⌘⇧Z opnieuw</li>
+              </ul>
+            </div>
+          ) : null}
         </div>
       </div>
     </EditorContext.Provider>
