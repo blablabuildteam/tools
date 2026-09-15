@@ -467,6 +467,14 @@ export default function WorkshopTool() {
     void persistColumns([...columns, col]);
   }
 
+  function deleteColumn(id: WorkshopColumnId) {
+    const next = columns
+      .filter((c) => c.id !== id)
+      .map((c, i) => ({ ...c, order: i }));
+    setCards((prev) => prev.filter((c) => c.columnId !== id));
+    void persistColumns(next);
+  }
+
   if (landing || locked) {
     return (
       <div className="min-h-screen bg-bla-dark text-bla-white">
@@ -688,6 +696,7 @@ export default function WorkshopTool() {
             onDelete={(id) => void deleteCard(id)}
             onChangeColumn={onChangeColumn}
             onAddColumn={addColumn}
+            onDeleteColumn={deleteColumn}
           />
           </div>
         </ViewEnter>

@@ -14,6 +14,7 @@ type Props = {
   onDelete: (id: string) => void;
   onChangeColumn: (column: WorkshopColumn) => void;
   onAddColumn: () => void;
+  onDeleteColumn: (id: WorkshopColumnId) => void;
 };
 
 function AutoGrowTextarea({
@@ -60,6 +61,7 @@ export default function WorkshopBoard({
   onDelete,
   onChangeColumn,
   onAddColumn,
+  onDeleteColumn,
 }: Props) {
   const byColumn = useMemo(() => {
     const map = new Map<WorkshopColumnId, WorkshopCard[]>();
@@ -87,7 +89,7 @@ export default function WorkshopBoard({
           <section
             key={col.id}
             data-view-item
-            className="flex w-[min(100%,340px)] shrink-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] sm:w-[360px]"
+            className="group/col flex w-[min(100%,340px)] shrink-0 flex-col rounded-2xl border border-white/10 bg-white/[0.03] sm:w-[360px]"
             style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
           >
             <div className="border-b border-white/10 px-3 py-3">
@@ -107,9 +109,19 @@ export default function WorkshopBoard({
                     className="mt-0.5 w-full resize-none bg-transparent text-[11px] leading-snug text-bla-text-muted outline-none placeholder:text-white/25"
                   />
                 </div>
-                <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] text-bla-text-muted">
-                  {list.length}
-                </span>
+                <div className="flex shrink-0 items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onDeleteColumn(col.id)}
+                    className="rounded-md p-1 text-bla-text-muted opacity-100 transition hover:text-red-300 md:opacity-0 md:group-hover/col:opacity-100 md:group-focus-within/col:opacity-100 md:focus-visible:opacity-100"
+                    aria-label="Verwijder sectie"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="rounded-md bg-white/10 px-1.5 py-0.5 text-[10px] text-bla-text-muted">
+                    {list.length}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
