@@ -5,7 +5,7 @@ import { DEPT_COLORS } from './types';
 export type ClaudeLevel2Status = 'shell' | 'drafting' | 'ready';
 
 /** Bump when seed briefs change — refreshes shell/drafting copy, keeps ready cases. */
-export const LEVEL2_SEED_VERSION = 18;
+export const LEVEL2_SEED_VERSION = 19;
 
 export const CROSS_TEAM_OPTIONS = Object.keys(DEPT_COLORS).filter((d) => d !== 'General');
 
@@ -21,6 +21,8 @@ export interface ClaudeLevel2Draft {
   prioritizeReuse: string;
   /** Hide the level 2 card + arrow (e.g. pending a team connect). */
   hideLevel2?: boolean;
+  /** Team skipped Level 1 presentations — this is their first case, at Level 2. */
+  startsAtLevel2?: boolean;
   status: ClaudeLevel2Status;
   seedVersion?: number;
   updatedAt?: string;
@@ -139,6 +141,22 @@ export const LEVEL2_SEEDS: Record<string, Seed> = {
     prioritizeReuse: '',
     status: 'ready',
   },
+  '24lddyfa': {
+    level1CaseId: '24lddyfa',
+    title: 'Catch cold new offers in Everflow',
+    recap:
+      'Account Management did not run a Level 1 case with the other teams. The workshop item is still the job: when a new offer is uploaded and sent to media buyers, it sometimes sits untested. Nobody has a reliable view of which new offers actually pick up traffic, so they slip. There is no Claude project or skill for this yet.',
+    idea:
+      'This is their first Claude case, at Level 2. First, set up the same foundational Project + skill the other teams already have (SKILL.md, rules, examples). Then connect Everflow MCP — read, not write — and have the skill list offers younger than X days that are generating traffic below Y. They pick both thresholds (workshop default: first week, very low traffic). Prove they would actually chase that list this week. Auto-reminders, Slack/Telegram send, and Everflow write-back are the sophisticated follow-up, not this sprint.',
+    instructions:
+      '1. Create a Claude Project for Account Management offer follow-up. Package a skill folder: SKILL.md, what “new” means (default 7 days — they set X), what “low traffic” means (they set Y clicks/conversions), who gets flagged (AM + the media buyer on the offer), and a fixed output template (offer id, name, age, traffic, why it looks cold, suggested next step).\n\n2. Drop in 2–3 offers that slipped and 2–3 that were tested promptly, so the skill knows what forgotten vs picked-up looks like.\n\n3. Connect Everflow MCP with the access they already have. Filter: created within X days AND traffic below Y. No write-back. A CSV export is a fallback only if MCP is blocked — the case is the live filter.\n\n4. Run it on a real slice of new offers. Produce the follow-up pack. Ask: would we chase these this week? If yes, the case is proven.',
+    presentationExpect:
+      'Show that it is possible:\n\n1. The Project + skill folder (SKILL.md, X/Y thresholds, examples) on screen.\n2. Everflow MCP connected — not a spreadsheet as the main path.\n3. One live (or recent) run: offers younger than X days with traffic below Y.\n4. A yes/no: would Account Management actually follow up this list? If yes, the case is proven.\n\nOut of scope this sprint: writing back to Everflow, auto-sending reminders, a live dashboard, becoming the offer desk. Those come after a successful proof.',
+    crossTeams: ['Media Buying'],
+    prioritizeReuse: '',
+    startsAtLevel2: true,
+    status: 'ready',
+  },
 };
 
 export function seedDraft(level1CaseId: string): ClaudeLevel2Draft {
@@ -182,6 +200,7 @@ export function mergeLevel2Draft(
     crossTeams: Array.isArray(saved.crossTeams) ? saved.crossTeams : base.crossTeams,
     prioritizeReuse: saved.prioritizeReuse ?? base.prioritizeReuse,
     hideLevel2: base.hideLevel2,
+    startsAtLevel2: base.startsAtLevel2,
     level1CaseId,
     seedVersion: staleSeed ? LEVEL2_SEED_VERSION : (saved.seedVersion ?? LEVEL2_SEED_VERSION),
     ...(staleSeed

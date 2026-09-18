@@ -249,6 +249,7 @@ export const ALL_PRIORITY_STATUSES = Object.keys(PRIORITY_STATUS_META) as Priori
 
 export const DEPT_COLORS: Record<string, string> = {
   'Affiliate Management': '#f472b6',
+  'Account Management': '#2dd4bf',
   'Media Buying': '#60a5fa',
   'BI / Pricing': '#a78bfa',
   'Finance': '#34d399',

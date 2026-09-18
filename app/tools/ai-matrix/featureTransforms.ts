@@ -58,9 +58,9 @@ export const FEATURE_TRANSFORMS: Record<string, FeatureTransform> = {
       'Pull best weekly offers from DB/Looker and email a personalized digest plus reminders to every partner — no manual export-and-send loop.',
   },
   '24lddyfa': {
-    title: 'New-offer follow-up reminders',
+    title: 'New-offer follow-up radar',
     description:
-      'Track newly uploaded offers sent to media buyers and nudge owners until the offer is tested, so nothing sits forgotten in the queue.',
+      'Flag newly uploaded Everflow offers that are still young and generating little traffic, so Account Management can chase what slipped before it goes cold.',
   },
   nuftl8dc: {
     title: 'PO request automation',

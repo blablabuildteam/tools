@@ -230,6 +230,7 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
               const status = inferStatus(draft);
               const dept = uc.label || 'General';
               const hideLevel2 = Boolean(draft.hideLevel2);
+              const startsAtLevel2 = Boolean(draft.startsAtLevel2);
               return (
                 <div key={uc.id}>
                   <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -239,6 +240,21 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                   </div>
 
                   <div className="grid items-stretch gap-3 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+                    {startsAtLevel2 ? (
+                      <div className="flex min-h-[280px] flex-col rounded-xl border border-dashed border-white/15 bg-white/[0.02] p-5">
+                        <div className="mb-3 flex items-center gap-2">
+                          <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-white/40">
+                            Level 1
+                          </span>
+                          <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-white/40">
+                            Empty
+                          </span>
+                        </div>
+                        <p className="mt-auto text-[13px] leading-relaxed text-white/35">
+                          No Level 1 case. This team starts at Level 2.
+                        </p>
+                      </div>
+                    ) : (
                     <button
                       type="button"
                       onClick={() => { setShowOriginal(false); setSelectedId(uc.id); }}
@@ -276,6 +292,7 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                         <span className="font-mono text-[10px] text-black/30 group-hover:text-black/50">Open</span>
                       </div>
                     </button>
+                    )}
 
                     {hideLevel2 ? (
                       <>
@@ -361,7 +378,10 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-[11px] text-white/40">
-                    Builds on the existing skill · {level2Case.name}{level2Case.owner ? ` · ${level2Case.owner}` : ''}
+                    {level2Draft.startsAtLevel2
+                      ? `First Claude case for this team · starts at Level 2 · ${level2Case.name}`
+                      : `Builds on the existing skill · ${level2Case.name}`}
+                    {level2Case.owner ? ` · ${level2Case.owner}` : ''}
                   </p>
                 </div>
                 <button type="button" onClick={() => setLevel2Id(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-white/12 text-white/50 hover:text-white">
@@ -480,7 +500,7 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
             </ModalReveal>
 
             <ModalReveal index={7} resetKey={level2Case.id} className="mt-5" skeleton={false}>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className={`flex flex-col gap-2 ${level2Draft.startsAtLevel2 ? '' : 'sm:flex-row'}`}>
               <button
                 type="button"
                 onClick={() => void persistDraft(level2Case.id, { status: inferStatus(level2Draft) === 'ready' ? 'drafting' : 'ready' })}
@@ -493,14 +513,16 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                 <BadgeCheck className="h-4 w-4" />
                 {inferStatus(level2Draft) === 'ready' ? 'Level 2 marked ready' : 'Mark Level 2 ready'}
               </button>
-              <button
-                type="button"
-                onClick={() => { setLevel2Id(null); setSelectedId(level2Case.id); }}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-3 text-[14px] font-medium text-white/70 hover:border-white/30 hover:text-white"
-              >
-                <Presentation className="h-4 w-4" />
-                Open Level 1 debrief
-              </button>
+              {!level2Draft.startsAtLevel2 && (
+                <button
+                  type="button"
+                  onClick={() => { setLevel2Id(null); setSelectedId(level2Case.id); }}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 px-4 py-3 text-[14px] font-medium text-white/70 hover:border-white/30 hover:text-white"
+                >
+                  <Presentation className="h-4 w-4" />
+                  Open Level 1 debrief
+                </button>
+              )}
             </div>
             </ModalReveal>
           </>
@@ -520,7 +542,9 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                 <div className="mb-1 flex flex-wrap items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getDeptColor(selected.label || 'General') }} />
                   <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">{selected.label || 'General'}</p>
-                  <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-white/50">Level 1</span>
+                  <span className="rounded-full border border-white/15 bg-white/5 px-2 py-0.5 font-mono text-[10px] text-white/50">
+                    {draftFor(selected.id).startsAtLevel2 ? 'Workshop source' : 'Level 1'}
+                  </span>
                   <span className="rounded-full px-2 py-0.5 font-mono text-[10px]" style={{ color: Q_META[getQuadrant(selected)].dot, backgroundColor: Q_META[getQuadrant(selected)].dot + '22' }}>
                     {Q_META[getQuadrant(selected)].label}
                   </span>
@@ -674,13 +698,19 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                   <Presentation className="h-4 w-4 text-white/70" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">Level 1 presentation debrief</p>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+                    {draftFor(selected.id).startsAtLevel2 ? 'No Level 1 presentation' : 'Level 1 presentation debrief'}
+                  </p>
                   <p className="mt-1 text-[13px] leading-relaxed text-white/50">
-                    Archive from the office presentations. Level 2 is drafted from these notes.
+                    {draftFor(selected.id).startsAtLevel2
+                      ? 'This team is joining on the Level 2 wave. The workshop item on the left is the source; the brief to run is the Level 2 card.'
+                      : 'Archive from the office presentations. Level 2 is drafted from these notes.'}
                   </p>
                 </div>
               </div>
 
+              {!draftFor(selected.id).startsAtLevel2 && (
+              <>
               <div className="mt-4 rounded-lg border border-white/10 bg-black/20 px-3.5 py-3">
                 <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">Probe questions</p>
                 <ul className="mt-2 space-y-1.5">
@@ -745,6 +775,8 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                   })}
                 </div>
               </div>
+              </>
+              )}
             </div>
             </ModalReveal>
 
@@ -756,7 +788,7 @@ export default function ClaudeCasesView({ useCases, sessionId, onBack, onUpdate 
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-bla-lime/40 bg-bla-lime/15 px-4 py-3 text-[14px] font-medium text-bla-lime"
               >
                 <Sparkles className="h-4 w-4" />
-                Open Level 2 shell
+                {draftFor(selected.id).startsAtLevel2 ? 'Open Level 2 brief' : 'Open Level 2 shell'}
               </button>
               <button type="button" onClick={() => onUpdate({ ...selected, buildInClaudeCode: !selected.buildInClaudeCode })}
                 className={`flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-[14px] font-medium transition-colors ${

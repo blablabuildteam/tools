@@ -93,6 +93,7 @@ const DEFAULT_LABELS = [
   'General',
   'Media Buying',
   'Affiliate Management',
+  'Account Management',
   'E-mail Marketing',
   'Finance',
   'HR',
@@ -101,6 +102,7 @@ const DEFAULT_LABELS = [
 
 const DEPT_COLORS: Record<string, string> = {
   'Affiliate Management': '#f472b6',
+  'Account Management': '#2dd4bf',
   'Media Buying': '#60a5fa',
   'BI / Pricing': '#a78bfa',
   'Finance': '#34d399',

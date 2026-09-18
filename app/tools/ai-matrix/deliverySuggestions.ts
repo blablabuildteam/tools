@@ -157,7 +157,7 @@ export const DELIVERY_SUGGESTIONS: Record<
   },
   '24lddyfa': {
     deliveryPartners: ['adsomnia', 'blablabuild'],
-    note: 'Following up new offers — sheet + reminders.',
+    note: 'Following up new offers — Everflow MCP filter for young + low-traffic offers.',
   },
   '80h0qak5': {
     deliveryPartners: ['adsomnia', 'blablabuild'],
