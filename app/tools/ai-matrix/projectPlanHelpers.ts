@@ -1,5 +1,6 @@
 import type { ProjectPlan, BlaBlaRecommendation } from './projectPlanTypes';
-import { getSolutionsText } from './projectPlanTypes';
+import { emptyProjectPlan, getSolutionsText, hasProjectPlanContent } from './projectPlanTypes';
+import { FEATURE_EFFORT_SEEDS, FEATURE_PLAN_SEEDS } from './featurePlanSeeds';
 import type {
   FeaturePhaseAssignment,
   FeaturePriority,
@@ -8,6 +9,7 @@ import type {
 import { normalizeFeaturePriority } from './prioritizeMeta';
 import {
   CLUSTER_MIGRATION_MAP,
+  DROPPED_RECOMMENDATION_TITLES,
   PROJECT_CLUSTERS_V2,
   type ProjectClusterV2,
 } from './projectClustersEnhanced';
@@ -61,7 +63,9 @@ export function loadRecommendationsForProject(
   const cluster = PROJECT_CLUSTERS_V2.find((c) => c.id === projectId);
   if (!cluster) return Object.values(existingRecs).filter((r) => r.projectId === projectId);
 
-  const existing = Object.values(existingRecs).filter((r) => r.projectId === projectId);
+  const existing = Object.values(existingRecs).filter(
+    (r) => r.projectId === projectId && !DROPPED_RECOMMENDATION_TITLES.has(r.title)
+  );
   const existingTitles = new Set(existing.map((r) => r.title));
 
   const newRecs: BlaBlaRecommendation[] = cluster.initialRecommendations
@@ -118,6 +122,16 @@ export function loadProjectPlan(
   return legacySplitPlan(projectId);
 }
 
+/** Brief for a nested project (former feature). Session edits win when filled; else seed. */
+export function loadFeaturePlan(
+  caseId: string,
+  featurePlans?: Record<string, ProjectPlan>
+): ProjectPlan {
+  const stored = featurePlans?.[caseId];
+  if (hasProjectPlanContent(stored)) return stored!;
+  return FEATURE_PLAN_SEEDS[caseId] || emptyProjectPlan();
+}
+
 /**
  * Get all projects with their plans and recommendations merged.
  */
@@ -145,13 +159,29 @@ export function initializeFeaturePhases(
 ): Record<string, FeaturePhaseAssignment> {
   const result: Record<string, FeaturePhaseAssignment> = {};
 
+  const retiredTitles = new Set([
+    'Compliant message variant generator',
+    'Template-driven Ongage message builder',
+    'Ongage message production',
+    'Centralised Email Dashboard',
+    'CV & cover letter screening agent',
+    'CV screening & interview prep',
+    'MB performance reporting automation',
+    'CPM drop daily alert report',
+    'DB / Looker data-quality triage',
+    'Financial MB reporting automation',
+  ]);
+
   Object.entries(existingPhases).forEach(([id, prev]) => {
     const transform = FEATURE_TRANSFORMS[id];
+    const refreshCopy = Boolean(transform && (!prev.transformedTitle || retiredTitles.has(prev.transformedTitle)));
     result[id] = {
       ...prev,
       priority: normalizeFeaturePriority(prev.priority || prev.phase),
-      transformedTitle: prev.transformedTitle || transform?.title,
-      transformedDescription: prev.transformedDescription || transform?.description,
+      transformedTitle: refreshCopy ? transform!.title : prev.transformedTitle || transform?.title,
+      transformedDescription: refreshCopy
+        ? transform!.description
+        : prev.transformedDescription || transform?.description,
     };
   });
 
@@ -169,7 +199,7 @@ export function initializeFeaturePhases(
                 ? 'low'
                 : 'backlog'
         ),
-        effort: 'm',
+        effort: FEATURE_EFFORT_SEEDS[uc.id] || 'm',
         approved: false,
         transformedTitle: transform?.title,
         transformedDescription: transform?.description,
@@ -178,6 +208,78 @@ export function initializeFeaturePhases(
   });
 
   return result;
+}
+
+/** Overlay calibrated High-project effort from FEATURE_EFFORT_SEEDS (session refresh on version bump). */
+export function applyFeatureEffortSeeds(
+  existingPhases: Record<string, FeaturePhaseAssignment>
+): Record<string, FeaturePhaseAssignment> {
+  const result = { ...existingPhases };
+  for (const [caseId, effort] of Object.entries(FEATURE_EFFORT_SEEDS)) {
+    const prev = result[caseId];
+    result[caseId] = {
+      ...prev,
+      caseId,
+      priority: 'high',
+      approved: false,
+      effort,
+    };
+  }
+  return result;
+}
+
+export function recommendationAsUseCase(rec: BlaBlaRecommendation): UseCase {
+  return {
+    id: rec.id,
+    name: rec.title,
+    description: rec.description,
+    knockout: { recurring: null, costly: null, dataAvailable: null, standardized: null },
+    scores: {
+      businessImpact: 3,
+      frequency: 3,
+      aiSuitability: 3,
+      implementation: 3,
+      risk: 3,
+      adoption: 3,
+    },
+    label: 'General',
+  };
+}
+
+export function recommendationPriority(
+  rec: BlaBlaRecommendation,
+  featurePhases: Record<string, FeaturePhaseAssignment>
+): FeaturePriority {
+  return normalizeFeaturePriority(
+    featurePhases[rec.id]?.priority ||
+      featurePhases[rec.id]?.phase ||
+      rec.suggestedPriority ||
+      rec.suggestedPhase
+  );
+}
+
+export function recommendationAssignment(
+  rec: BlaBlaRecommendation,
+  featurePhases: Record<string, FeaturePhaseAssignment>
+): FeaturePhaseAssignment {
+  const prev = featurePhases[rec.id];
+  if (prev) {
+    return {
+      ...prev,
+      priority: normalizeFeaturePriority(prev.priority || prev.phase || rec.suggestedPriority),
+      effort: prev.effort || rec.effort || 'm',
+      transformedTitle: prev.transformedTitle || rec.title,
+      transformedDescription: prev.transformedDescription || rec.description,
+    };
+  }
+  return {
+    caseId: rec.id,
+    priority: normalizeFeaturePriority(rec.suggestedPriority || rec.suggestedPhase),
+    effort: rec.effort || 'm',
+    transformedTitle: rec.title,
+    transformedDescription: rec.description,
+    approved: false,
+  };
 }
 
 /**

@@ -5,6 +5,7 @@ import type {
   FeatureRequest,
   BlaBlaRecommendation,
 } from './projectPlanTypes';
+import type { ClaudeLevel2State } from './claudeLevel2';
 
 export type ProjectDecisionKind = 'pending' | 'keep' | 'split' | 'park' | 'kill';
 
@@ -81,6 +82,8 @@ export interface FeaturePhaseAssignment {
   acceptanceCriteria?: string[];
   transformedTitle?: string;
   transformedDescription?: string;
+  /** Team runs this in Claude — no custom product required. */
+  handledInClaude?: boolean;
   approved?: boolean;
   updatedAt?: string;
 }
@@ -100,8 +103,11 @@ export interface PrioritizeMetaState {
   // NEW: Enhanced project planning fields
   // ══════════════════════════════════════════════════════════════════════════
 
-  /** High-level project plans keyed by project ID */
+  /** Theme-level plans keyed by cluster ID (legacy — briefs now live on featurePlans) */
   projectPlans?: Record<string, ProjectPlan>;
+
+  /** Project briefs keyed by case/feature ID (high-priority items) */
+  featurePlans?: Record<string, ProjectPlan>;
 
   /** Feature priority assignments keyed by case ID */
   featurePhases?: Record<string, FeaturePhaseAssignment>;
@@ -114,6 +120,37 @@ export interface PrioritizeMetaState {
 
   /** Whether the user has migrated to enhanced clusters */
   usesEnhancedClusters?: boolean;
+
+  /** Level 2 Claude case shells + questionnaire (keyed via drafts) */
+  claudeLevel2?: ClaudeLevel2State;
+
+  /** Last applied FEATURE_EFFORT_SEED_VERSION — refresh High project effort chips on bump */
+  featureEffortSeedVersion?: number;
+
+  /** Last applied FEATURE_PLAN_SEED_VERSION — refresh High project briefs on bump */
+  featurePlanSeedVersion?: number;
+
+  /** Roadmap wave assignments for phased project delivery */
+  roadmapWaves?: RoadmapWave[];
+  roadmapWavesSeedVersion?: number;
+}
+
+/** A wave in the phased roadmap */
+export interface RoadmapWave {
+  id: string;
+  title: string;
+  monthStart: number;
+  monthEnd: number;
+  rationale: string;
+  items: RoadmapWaveItem[];
+}
+
+/** A project phase within a roadmap wave */
+export interface RoadmapWaveItem {
+  caseId: string;
+  phaseId: string;
+  /** Override title if needed */
+  title?: string;
 }
 
 export function lsMetaKey(sessionId: string) {
@@ -157,6 +194,10 @@ export async function loadPrioritizeMeta(sessionId: string): Promise<PrioritizeM
         ...(local?.projectPlans || {}),
         ...(remote?.projectPlans || {}),
       },
+      featurePlans: {
+        ...(local?.featurePlans || {}),
+        ...(remote?.featurePlans || {}),
+      },
       featurePhases: {
         ...(local?.featurePhases || {}),
         ...(remote?.featurePhases || {}),
@@ -169,6 +210,24 @@ export async function loadPrioritizeMeta(sessionId: string): Promise<PrioritizeM
         remote?.enhancedClustersVersion ?? local?.enhancedClustersVersion,
       usesEnhancedClusters:
         remote?.usesEnhancedClusters ?? local?.usesEnhancedClusters,
+      claudeLevel2: {
+        drafts: {
+          ...(local?.claudeLevel2?.drafts || {}),
+          ...(remote?.claudeLevel2?.drafts || {}),
+        },
+      },
+      featureEffortSeedVersion:
+        remote?.featureEffortSeedVersion ?? local?.featureEffortSeedVersion,
+      featurePlanSeedVersion:
+        remote?.featurePlanSeedVersion ?? local?.featurePlanSeedVersion,
+      roadmapWaves:
+        remote?.roadmapWaves && remote.roadmapWaves.length > 0
+          ? remote.roadmapWaves
+          : local?.roadmapWaves && local.roadmapWaves.length > 0
+            ? local.roadmapWaves
+            : undefined,
+      roadmapWavesSeedVersion:
+        remote?.roadmapWavesSeedVersion ?? local?.roadmapWavesSeedVersion,
     };
   } catch {
     return local || {};

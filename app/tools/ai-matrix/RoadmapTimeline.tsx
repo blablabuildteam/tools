@@ -12,7 +12,7 @@ import {
 } from './types';
 
 /** Planning calendar start — first full month after workshop follow-up. */
-export const ROADMAP_START = new Date(2026, 8, 1); // 1 Sep 2026
+export const ROADMAP_START = new Date(2026, 9, 1); // 1 Oct 2026
 export const TIMELINE_MONTHS = 12;
 
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

@@ -28,9 +28,9 @@ export const CLUSTERS_ENHANCED_VERSION = 1;
  * Recommended project structure with splits applied:
  * 
  * SPLITS APPLIED:
- * 1. affiliate-partner-ops (12 cases) → 
- *    - partner-activation (6 cases) - Partner communication & activation
- *    - partner-intelligence (6 cases) - Partner monitoring & knowledge
+ * 1. affiliate-partner-ops (12 cases) → Partner Intelligence Hub
+ *    (activation comms + knowledge/monitoring were split, then folded back —
+ *    onboarding is a project, not a second theme)
  * 
  * 2. media-buy-performance (11 cases) →
  *    - mb-campaign-launch (5 cases) - Campaign launch & creative
@@ -42,17 +42,18 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
   // ══════════════════════════════════════════════════════════════════════════
   {
     id: 'email-ongage',
-    name: 'Email Delivery & Content Engine',
-    summary: 'Reliable ESP operations (quota, servers, alerts) plus compliant message/HTML craft in one Ongage stack.',
+    name: 'Email Content and Delivery Engine',
+    summary:
+      'First, speed up email content production so it can run at scale and on brand — copy, templates, and write-back into Ongage as one loop. Once that is shipping, look at the rest of the desk: send health, quotas, server distribution, and alerts that actually matter.',
     rationale: 'Shared Ongage/ESP surface — delivery reliability and message craft land as one initiative.',
     suggestedHorizon: 'now',
     primaryDelivery: ['adsomnia', 'bending-the-rules', 'blablabuild'],
-    caseIds: ['6wwxlvke', 'zbvbw4s5', '0zzpakqt', 'hss1gydb', 'yax6ipd9', 'q8t5rvsh'],
+    caseIds: ['6wwxlvke', '0zzpakqt', 'hss1gydb', 'yax6ipd9', 'q8t5rvsh'],
     plan: {
       problemStatement: 'Email team spends significant time on manual message creation, compliance checking, and monitoring delivery health across servers. No unified view of send capacity and server distribution.',
       opportunity: 'Automate compliant message generation, centralize delivery monitoring, and optimize server distribution to increase email throughput while reducing manual effort and compliance risk.',
       solutions: [
-        'Claude-powered compliant message variant generator with legal guardrails',
+        'Email production loop — copy, template fills, Ongage write-back, and performance back into the next pack',
         'Automated HTML email template builder with brand consistency',
         'Real-time Slack alerts for delivery issues (bounces, complaints, blacklists)',
         'Daily send quota dashboard with predictive capacity planning',
@@ -83,120 +84,69 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
         effort: 's',
         category: 'analytics',
       },
-      {
-        title: 'Deliverability Health Score Dashboard',
-        description: 'Single-pane view of sender reputation, blacklist status, and domain health across all sending IPs.',
-        rationale: 'Currently monitoring is reactive. Proactive health monitoring prevents issues before they impact campaigns.',
-        expectedValue: 'Early warning system reduces deliverability incidents by 40%.',
-        suggestedPhase: 'now',
-        effort: 'm',
-        category: 'analytics',
-      },
     ],
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // AFFILIATE - SPLIT INTO TWO WORKSTREAMS
+  // AFFILIATE — one partner lifecycle desk
   // ══════════════════════════════════════════════════════════════════════════
-  {
-    id: 'partner-activation',
-    name: 'Partner Activation Hub',
-    summary: 'Streamline partner onboarding, activation messaging, and routine communications with automated drafts and follow-ups.',
-    rationale: 'Core partner communication loop (activation → messaging → follow-up) shares the same workflow and tools. Distinct from monitoring/intelligence work.',
-    suggestedHorizon: 'near',
-    primaryDelivery: ['adsomnia', 'blablabuild'],
-    caseIds: ['s01zg1dt', 'nq108m56', 'aiqyvin4', '24lddyfa', 'nuftl8dc', '0pk6tzpv'],
-    plan: {
-      problemStatement: 'Partner activation and communication is manual and inconsistent. Follow-ups are missed, messaging lacks personalization, and there\'s no unified view of partner communication history.',
-      opportunity: 'Create a systematic partner communication engine that automates routine outreach while maintaining personalization, ensuring no partner falls through the cracks.',
-      solutions: [
-        'Claude-powered personalized activation message generator',
-        'Automated payout pause/change communication drafts',
-        'Weekly partner digest automation from CSV/exports',
-        'New offer follow-up reminder system with templates',
-        'PO setting request automation with approval workflow',
-        'Weekly sync digest aggregator for partner meetings',
-      ],
-      expectedImpact: '60% faster partner activation, 100% follow-up coverage, standardized communication quality.',
-      targetAudience: ['Affiliate Management Team', 'Partner Success', 'Account Managers'],
-      businessValue: 'Faster partner activation = faster revenue. Consistent communication = better partner retention. Reduced manual work = more time for relationship building.',
-      technicalApproach: 'Claude for message generation with partner context. Google Sheets/CSV integration for data. Slack/email for delivery. Reminder system on existing workflow tools.',
-      risks: [
-        'Over-automation may feel impersonal to high-value partners',
-        'PO automation blocked until Everflow write access confirmed',
-        'Partner data quality varies, affecting personalization',
-      ],
-      dependencies: [
-        'Partner data access (CRM, spreadsheets)',
-        'Email/messaging platform integration',
-        'Everflow write access for PO automation',
-      ],
-    },
-    initialRecommendations: [
-      {
-        title: 'Partner Communication History Timeline',
-        description: 'Unified view of all communications with each partner across channels (email, Telegram, meetings).',
-        rationale: 'Currently team members don\'t have visibility into each other\'s partner communications, leading to duplicate outreach or dropped balls.',
-        expectedValue: 'Single source of truth for partner relationships. Eliminates duplicate messages and improves handoffs.',
-        suggestedPhase: 'near',
-        effort: 'm',
-        category: 'integration',
-      },
-      {
-        title: 'Partner Response Sentiment Tracking',
-        description: 'Automatically tag partner responses as positive/neutral/negative to surface at-risk relationships.',
-        rationale: 'Early warning on partner satisfaction enables proactive relationship management.',
-        expectedValue: 'Identify at-risk partners before they churn. Prioritize account manager attention.',
-        suggestedPhase: 'next',
-        effort: 's',
-        category: 'analytics',
-      },
-    ],
-  },
   {
     id: 'partner-intelligence',
     name: 'Partner Intelligence Hub',
-    summary: 'Centralize partner knowledge, monitor traffic/performance signals, and generate leads — the intelligence layer for affiliate operations.',
-    rationale: 'Knowledge management, monitoring, and lead generation share an intelligence/data focus distinct from direct partner communication.',
+    summary:
+      'First, one partner desk AMs will actually use: knowledge in one place, and outreach that stays personal at scale — activation packs, digests, and pause notices. Once that is trusted, automate the rest of the cycle — POs, payment status, LP alerts, lead dossiers, and a unified partner CRM.',
+    rationale:
+      'Activation comms and partner intelligence are the same AM job. Onboarding is a project on this desk; pause notices, digests, POs, CRM, briefs, and leads are maintenance and growth of the same relationships — not a second theme.',
     suggestedHorizon: 'near',
     primaryDelivery: ['adsomnia', 'blablabuild'],
-    caseIds: ['7oexv73t', 'qa6wbwif', '07g9fjmq', 'c2tybb1k', '3z1pgtaa', '6xgc2yoh'],
+    caseIds: [
+      's01zg1dt',
+      'nq108m56',
+      'aiqyvin4',
+      '24lddyfa',
+      'nuftl8dc',
+      '0pk6tzpv',
+      '7oexv73t',
+      'qa6wbwif',
+      '07g9fjmq',
+      'c2tybb1k',
+      '3z1pgtaa',
+      '6xgc2yoh',
+      '9qpxrbua',
+    ],
     plan: {
-      problemStatement: 'Partner knowledge is scattered across chats, notes, and people\'s heads. No systematic way to track partner health signals or identify new partner opportunities.',
-      opportunity: 'Build a partner intelligence system that captures knowledge, monitors health signals, and surfaces growth opportunities.',
+      problemStatement:
+        'Partner work is split across chats, exports, Everflow, and personal Claude skills. Onboarding is inconsistent; maintenance (pauses, digests, POs, follow-ups) is manual; knowledge lives in people’s heads. Treating “activation” and “intelligence” as two tools duplicates the affiliate desk.',
+      opportunity:
+        'One Partner Intelligence Hub. The activation pack is the onboarding project. Everything else is how AMs maintain, grow, and manage partners — with knowledge and performance in the same place as the messages.',
       solutions: [
-        'Morning reports automation (export → AI brief)',
-        'Telegram chat notetaker for partner knowledge capture',
-        'Partner knowledge CRM from pasted chat histories',
-        'Landing page performance alerts via Telegram bot',
-        'Payment cycle update tracker',
-        'Affiliate lead generator with research dossiers',
+        'Personalized activation pack for net-new partners (onboarding)',
+        'Maintenance comms: pause notices, weekly offer digest, PO requests, HN sync',
+        'Morning performance brief and LP alerts',
+        'Telegram notetaker + partner knowledge CRM',
+        'Unified client/partner CRM across notes, Everflow, and briefs (later scale of the knowledge layer)',
+        'Payment-cycle status and affiliate lead dossiers',
       ],
-      expectedImpact: 'Complete partner knowledge base, real-time performance visibility, 2x lead pipeline.',
-      targetAudience: ['Affiliate Management Team', 'Business Development', 'Finance'],
-      businessValue: 'Better partner decisions through data. Faster issue resolution through centralized knowledge. Growth through systematic lead generation.',
-      technicalApproach: 'Telegram bot for chat capture and alerts. Claude for knowledge extraction and lead research. Integration with existing data sources for monitoring.',
+      expectedImpact:
+        'No second partner theme. Onboarding and ongoing management share context. Faster first send, fewer dropped follow-ups, one knowledge layer.',
+      targetAudience: ['Affiliate Management', 'Partner Success', 'BI / Pricing', 'Finance (payment cycle)'],
+      businessValue:
+        'Faster activation and better retention from the same desk. AMs spend time on relationships, not assembling packs and hunting notes.',
+      technicalApproach:
+        'Activation pack already specified (Everflow + Telegram + BI). Remaining projects attach to the same hub: exports, Telegram, Everflow read, and review-then-send patterns.',
       risks: [
-        'Telegram bot LP alerts requires scoped Everflow access',
-        'Knowledge extraction accuracy depends on chat quality',
-        'Lead dossiers need careful compliance review',
+        'Over-automation may feel impersonal to high-value partners',
+        'PO automation blocked until Everflow write access is confirmed',
+        'Telegram/Everflow access for LP alerts and chat capture',
       ],
       dependencies: [
-        'Telegram API access',
-        'Everflow read access for performance data',
-        'Partner data sources for lead research',
+        'Everflow partner records and (later) write access for POs',
+        'Telegram groups / bot',
+        'BI / Pricing for offer logic',
+        'Historic comms and chat as knowledge',
       ],
     },
     initialRecommendations: [
-      {
-        title: 'Partner Health Score Dashboard',
-        description: 'Composite score combining traffic trends, payment history, communication frequency, and conversion rates.',
-        rationale: 'Currently partner health is assessed ad-hoc. Systematic scoring enables proactive management.',
-        expectedValue: 'Predict partner churn 30 days in advance. Prioritize team focus on high-risk/high-value partners.',
-        suggestedPhase: 'near',
-        effort: 'm',
-        category: 'analytics',
-      },
       {
         title: 'Competitive Intelligence Tracker',
         description: 'Monitor competitor offers, payout changes, and market movements relevant to your partner base.',
@@ -247,15 +197,6 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
     },
     initialRecommendations: [
       {
-        title: 'Campaign Launch Checklist Automation',
-        description: 'Interactive checklist that auto-validates campaign setup (targeting, budgets, tracking) before launch.',
-        rationale: 'Launch errors are costly. Systematic validation catches mistakes before they impact performance.',
-        expectedValue: 'Eliminate launch errors. Reduce QA time by 70%.',
-        suggestedPhase: 'now',
-        effort: 's',
-        category: 'quick-win',
-      },
-      {
         title: 'Creative Performance Predictor',
         description: 'AI analysis of creative elements (images, copy, CTAs) with predicted performance scores.',
         rationale: 'Currently creative decisions are intuition-based. Data-driven creative selection improves results.',
@@ -269,26 +210,25 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
   {
     id: 'mb-performance-ops',
     name: 'Performance Monitoring Hub',
-    summary: 'Real-time performance visibility, automated reporting, and proactive alerting for media buying operations.',
+    summary:
+      'First, one trusted performance picture: centralize the data and only surface insights and anomalies that actually matter. Once that desk is believed, start automating the actions that follow — YieldPro routing, pacing, and the reporting packs that still get rebuilt by hand.',
     rationale: 'Ongoing performance monitoring and reporting share a data/alerting focus distinct from campaign launch.',
     suggestedHorizon: 'now',
     primaryDelivery: ['adsomnia', 'blablabuild'],
-    caseIds: ['ytfkqqwj', '1y16z6b7', 'ldfa53nk', 'mg6vhvhm', 'id1vevde', '2e5qnofn'],
+    caseIds: ['ytfkqqwj', 'ldfa53nk', 'id1vevde', '2e5qnofn'],
     plan: {
       problemStatement: 'Performance monitoring is manual and reactive. Buyers spend hours on reporting instead of optimization. Issues are discovered too late.',
       opportunity: 'Build a performance operations center with automated reporting, real-time alerts, and optimization recommendations.',
       solutions: [
-        'MB performance reporting automation (ScaleWizard/exports)',
-        'Performance alarming with threshold-based alerts',
-        'Financial MB reporting automation',
-        'Daily stats autofill from tracker exports',
+        'MB performance reporting — custom dashboard on the Looker Studio feed, anomaly agent, daily/weekly packs, Slack alerts',
+        'Financial MB reporting — kill Sheets; API + manual template entry; what-matters packs and Slack',
         'YP auto-optimization integration',
         'YP alert system for tech/performance metrics',
       ],
       expectedImpact: '80% reduction in reporting time, 15-minute issue detection, data-driven optimization.',
       targetAudience: ['Media Buying Team', 'Finance', 'Operations'],
       businessValue: 'Faster issue response = reduced wasted spend. Automated reporting = more optimization time. Better visibility = better decisions.',
-      technicalApproach: 'Tracker API integration for data. Alerting system with Slack/email. Dashboard on existing BI stack. YP API for optimization.',
+      technicalApproach: 'Looker Studio feed for performance packs. Separate financial ledger (API + manual entry, no Sheets). YP is another project.',
       risks: [
         'Tracker API rate limits may constrain real-time monitoring',
         'Alert fatigue if thresholds not tuned properly',
@@ -302,15 +242,6 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
       ],
     },
     initialRecommendations: [
-      {
-        title: 'Anomaly Detection for Campaign Performance',
-        description: 'ML-based detection of unusual performance patterns (sudden drops, conversion anomalies).',
-        rationale: 'Simple threshold alerts miss complex issues. Anomaly detection catches problems threshold-based monitoring misses.',
-        expectedValue: 'Catch performance issues 2 hours earlier on average.',
-        suggestedPhase: 'near',
-        effort: 'm',
-        category: 'automation',
-      },
       {
         title: 'Budget Pacing Alerts',
         description: 'Proactive alerts when campaigns are under/over-pacing against daily/weekly budgets.',
@@ -329,7 +260,8 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
   {
     id: 'adops-tracker',
     name: 'Tracker Operations Center',
-    summary: 'Keep Voluum/ExAds flows clean: playbooks, CPM/TSD signals, uploads — Ad Ops control plane.',
+    summary:
+      'First, one trusted tracker picture: centralize CPM, flow, and drop data and only alert on what Ad Ops should act on. Once that is believed, automate the actions — offer uploads, TSD share, banner cuts, and the flow moves the playbook already encodes.',
     rationale: 'Tracker hygiene + flow decisions share systems; fold low-leverage tasks into alerting rather than side quests.',
     suggestedHorizon: 'near',
     primaryDelivery: ['adsomnia', 'blablabuild'],
@@ -339,7 +271,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
       opportunity: 'Create a tracker control plane with standardized flows, automated monitoring, and systematic optimization.',
       solutions: [
         'Flow optimization playbooks with best practices',
-        'CPM drop alerting with automated investigation',
+        'CPM reporting & drop alerts — Looker Studio feed, daily pack, Slack (absorbs automated CPM reporting)',
         'TSD optimization guidelines and automation',
         'Offer upload automation to Voluum',
         'ExAds banner optimization workflow',
@@ -360,17 +292,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
         'Documentation platform for playbooks',
       ],
     },
-    initialRecommendations: [
-      {
-        title: 'Flow Health Score',
-        description: 'Automated scoring of flow quality based on conversion rates, load times, and error rates.',
-        rationale: 'Currently flow quality is assessed manually. Automated scoring surfaces issues and prioritizes fixes.',
-        expectedValue: 'Identify problematic flows 50% faster. Prioritize optimization efforts.',
-        suggestedPhase: 'near',
-        effort: 's',
-        category: 'analytics',
-      },
-    ],
+    initialRecommendations: [],
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -379,16 +301,16 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
   {
     id: 'bi-pricing-payouts',
     name: 'Pricing Intelligence Hub',
-    summary: 'Data-quality triage, payout defaults/moves, and pricing experiments on Looker/DB truth.',
+    summary: 'Claude-first data-quality triage (knowledge center), payout defaults/moves, and pricing experiments. Live Looker is later.',
     rationale: 'BI/Pricing owns commercial rules + data truth — one initiative for payout/pricing decisions.',
     suggestedHorizon: 'near',
     primaryDelivery: ['adsomnia', 'blablabuild'],
-    caseIds: ['bidqcl01', 'pnsh385v', '5wq983os', 'l32k9os0', 'ge20ac29', 'yr4x9ymq', 'd49ghn33'],
+    caseIds: ['5wq983os', 'pnsh385v', 'l32k9os0', 'ge20ac29', 'yr4x9ymq', 'd49ghn33'],
     plan: {
       problemStatement: 'Pricing decisions are slow and risky due to manual analysis. Data quality issues cause incorrect payouts. No systematic experimentation framework.',
       opportunity: 'Build a pricing intelligence platform with automated analysis, data quality monitoring, and experimentation capabilities.',
       solutions: [
-        'Data quality triage system with automated checks',
+        'DB / Looker data-quality triage — Claude + knowledge center; productize the center only after the connect',
         'Text-to-SQL investigative queries on BI schema',
         'Automated payout defaults management',
         'Payout increase/decrease analysis automation',
@@ -410,26 +332,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
         'Everflow write access for payout automation',
       ],
     },
-    initialRecommendations: [
-      {
-        title: 'Margin Opportunity Finder',
-        description: 'Automated analysis to identify underpriced offers and margin improvement opportunities.',
-        rationale: 'Manual margin analysis misses opportunities. Systematic scanning surfaces quick wins.',
-        expectedValue: '5-10% margin improvement on identified opportunities.',
-        suggestedPhase: 'near',
-        effort: 'm',
-        category: 'analytics',
-      },
-      {
-        title: 'Payout Anomaly Detection',
-        description: 'Automated flagging of unusual payout patterns that may indicate errors or fraud.',
-        rationale: 'Manual review misses subtle patterns. Automated detection catches issues faster.',
-        expectedValue: 'Reduce payout errors by 50%. Faster fraud detection.',
-        suggestedPhase: 'now',
-        effort: 's',
-        category: 'automation',
-      },
-    ],
+    initialRecommendations: [],
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -486,7 +389,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
   {
     id: 'hr-enablement',
     name: 'HR Assistant Hub',
-    summary: 'Handbook Q&A (merge dups), CV screening, weekly goals, onboarding plans — Claude-first HR kit.',
+    summary: 'Handbook Q&A (merge dups), CV/cover-letter screen + interview kit, weekly goals, onboarding plans — Claude-first HR kit.',
     rationale: 'Content/skills in Claude with HR as owner; handbook duplicates collapse into one agent.',
     suggestedHorizon: 'now',
     primaryDelivery: ['adsomnia', 'blablabuild'],
@@ -496,7 +399,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
       opportunity: 'Build a Claude-first HR toolkit that automates routine tasks while improving employee experience.',
       solutions: [
         'HR handbook Q&A agent (consolidating duplicates)',
-        'Recruitment scorecards with CV analysis',
+        'One Claude skill: CV + cover letter screen, then interview kit',
         'Weekly HR checks with priorities extraction',
         'Personalized onboarding plan generation',
         'HR workflow integration with Personio/Slack',
@@ -526,15 +429,6 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
         suggestedPhase: 'near',
         effort: 's',
         category: 'analytics',
-      },
-      {
-        title: 'Onboarding Progress Tracker',
-        description: 'Automated tracking of new hire onboarding completion with manager notifications.',
-        rationale: 'Currently onboarding progress is tracked manually. Automated tracking ensures nothing falls through.',
-        expectedValue: '100% onboarding completion tracking. Faster time-to-productivity.',
-        suggestedPhase: 'now',
-        effort: 's',
-        category: 'quick-win',
       },
     ],
   },
@@ -575,84 +469,7 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
         'Everflow access for offer management',
       ],
     },
-    initialRecommendations: [
-      {
-        title: 'API Integration Health Monitor',
-        description: 'Real-time monitoring of partner API integration health with proactive outreach on issues.',
-        rationale: 'Integration issues cause partner churn. Proactive monitoring improves retention.',
-        expectedValue: 'Reduce integration-related churn by 25%.',
-        suggestedPhase: 'next',
-        effort: 'm',
-        category: 'automation',
-      },
-    ],
-  },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // SMALLER PROJECTS - Unchanged
-  // ══════════════════════════════════════════════════════════════════════════
-  {
-    id: 'crm-platform',
-    name: 'Client CRM Platform',
-    summary: 'Central client database across systems — treat as a multi-phase program, not a sprint.',
-    rationale: 'Big-rock integration; keep Later until phased slices and owner are clear.',
-    suggestedHorizon: 'later',
-    primaryDelivery: ['tbd', 'adsomnia', 'blablabuild'],
-    caseIds: ['9qpxrbua'],
-    plan: {
-      problemStatement: 'Client data is fragmented across multiple systems with no single source of truth.',
-      opportunity: 'Create unified client view to improve operations and decision-making.',
-      solutions: ['Central CRM integration connecting all systems'],
-      expectedImpact: 'Single source of truth for client data, improved operational efficiency.',
-      targetAudience: ['All Teams'],
-      businessValue: 'Better client management = improved retention and growth.',
-      technicalApproach: 'Multi-system integration program with phased delivery.',
-      risks: ['Large scope, complex integration', 'Unclear ownership', 'Multi-system dependencies'],
-      dependencies: ['System access across organization', 'Clear owner assignment', 'Phased roadmap'],
-    },
-    initialRecommendations: [
-      {
-        title: 'CRM Data Audit',
-        description: 'Comprehensive audit of client data across all systems to understand integration scope.',
-        rationale: 'Before building, need to understand the data landscape.',
-        expectedValue: 'Clear scope and phasing for CRM program.',
-        suggestedPhase: 'later',
-        effort: 'm',
-        category: 'analytics',
-      },
-    ],
-  },
-  {
-    id: 'meeting-productivity',
-    name: 'Meeting Assistant',
-    summary: 'Boost meeting effectiveness with notes/structure — confirm Gemini vs Claude before scaling.',
-    rationale: 'Standalone enablement slice; stack choice is the open question.',
-    suggestedHorizon: 'next',
-    primaryDelivery: ['adsomnia', 'blablabuild'],
-    caseIds: ['jtzx6rw7'],
-    plan: {
-      problemStatement: 'Meeting notes are inconsistent. Action items get lost. No structure for effective meetings.',
-      opportunity: 'AI-assisted meeting productivity with notes, action tracking, and structure.',
-      solutions:
-        'AI meeting assistant that captures notes, extracts action items, and supports follow-up so teams leave meetings with a clear, tracked plan.',
-      expectedImpact: '50% better meeting follow-through, consistent documentation.',
-      targetAudience: ['All Employees'],
-      businessValue: 'Better meetings = better execution. Action tracking = accountability.',
-      technicalApproach: 'Evaluate Gemini vs Claude for meeting assistance. Integration with calendar/notes tools.',
-      risks: ['Tool choice (Gemini vs Claude) not confirmed', 'Adoption depends on ease of use'],
-      dependencies: ['Tool decision', 'Calendar/notes integration'],
-    },
-    initialRecommendations: [
-      {
-        title: 'Meeting Effectiveness Metrics',
-        description: 'Track meeting outcomes, action completion rates, and time spent to identify improvement opportunities.',
-        rationale: "Can't improve what you don't measure.",
-        expectedValue: 'Identify meeting patterns that work/don\'t work. Reduce meeting time 20%.',
-        suggestedPhase: 'next',
-        effort: 's',
-        category: 'analytics',
-      },
-    ],
+    initialRecommendations: [],
   },
 ];
 
@@ -660,9 +477,26 @@ export const PROJECT_CLUSTERS_V2: ProjectClusterV2[] = [
  * Map from original cluster IDs to new cluster IDs for migration.
  */
 export const CLUSTER_MIGRATION_MAP: Record<string, string[]> = {
-  'affiliate-partner-ops': ['partner-activation', 'partner-intelligence'],
+  'affiliate-partner-ops': ['partner-intelligence'],
+  'partner-activation': ['partner-intelligence'],
   'media-buy-performance': ['mb-campaign-launch', 'mb-performance-ops'],
 };
+
+/** Seed recs that duplicate developed projects — prune from saved sessions on seed bump. */
+export const DROPPED_RECOMMENDATION_TITLES = new Set([
+  'Deliverability Health Score Dashboard',
+  'Partner Communication History Timeline',
+  'Partner Response Sentiment Tracking',
+  'Partner Health Score Dashboard',
+  'CRM data audit',
+  'Campaign Launch Checklist Automation',
+  'Anomaly Detection for Campaign Performance',
+  'Flow Health Score',
+  'Payout Anomaly Detection',
+  'Margin Opportunity Finder',
+  'API Integration Health Monitor',
+  'Onboarding Progress Tracker',
+]);
 
 /**
  * Get project by ID.

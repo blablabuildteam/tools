@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Edit2 } from 'lucide-react';
 import {
   type PriorityStatus,
   type UseCase,
@@ -43,25 +43,33 @@ import {
   scoreProject,
   type ProjectScoreInputs,
 } from './projectScore';
-import ProjectPlanPanel from './ProjectPlanPanel';
-import type { ProjectPlan, BlaBlaRecommendation } from './projectPlanTypes';
+import ProjectPlanPanel, { CollapseReveal, GappyDashFrame } from './ProjectPlanPanel';
+import { motion } from 'framer-motion';
+import { hasProjectPlanContent, type ProjectPlan, type BlaBlaRecommendation } from './projectPlanTypes';
 import {
-  loadProjectPlan,
   loadRecommendationsForProject,
   initializeFeaturePhases,
-  approveRecommendation,
-  rejectRecommendation,
-  calculatePhaseDistribution,
+  applyFeatureEffortSeeds,
   resolveFeatureCopy,
+  loadFeaturePlan,
+  recommendationAsUseCase,
+  recommendationPriority,
+  recommendationAssignment,
 } from './projectPlanHelpers';
-import { getSolutionsText } from './projectPlanTypes';
+import { FEATURE_EFFORT_SEED_VERSION, FEATURE_PLAN_SEED_VERSION, FEATURE_PLAN_SEEDS } from './featurePlanSeeds';
+import { DROPPED_RECOMMENDATION_TITLES } from './projectClustersEnhanced';
 import {
   FEATURE_PRIORITY_META,
+  normalizeFeaturePriority,
   type FeaturePriority,
 } from './prioritizeMeta';
 
 export type CaseInterest = 'yes' | 'maybe' | 'no';
 type Mode = 'triage' | 'grouping' | 'planning';
+
+export function prioritizeProjectRowId(caseId: string) {
+  return `prioritize-project-${caseId}`;
+}
 
 interface Props {
   useCases: UseCase[];
@@ -95,10 +103,16 @@ function ScoreBreakdown({ uc }: { uc: UseCase }) {
         className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-white/40 hover:text-white/70"
       >
         score {total.toFixed(1)} / 5
-        {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+        <motion.span
+          animate={{ rotate: open ? 90 : 0 }}
+          transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+          className="inline-flex"
+        >
+          <ChevronRight className="h-3 w-3" />
+        </motion.span>
         <span className="normal-case tracking-normal text-white/25">how scored</span>
       </button>
-      {open && (
+      <CollapseReveal open={open}>
         <div className="mt-2 space-y-1.5 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
           <p className="text-[11px] leading-relaxed text-white/45">
             Workshop scores (1–5), weighted into one total. Same formula as the matrix.
@@ -126,7 +140,7 @@ function ScoreBreakdown({ uc }: { uc: UseCase }) {
             <span className="tabular-nums">{total.toFixed(2)}</span>
           </div>
         </div>
-      )}
+      </CollapseReveal>
     </div>
   );
 }
@@ -368,15 +382,20 @@ function ProjectBlock({
   scoreInputs,
   onScoreChange,
   rank,
-  projectPlan,
-  onPlanChange,
   featurePhases,
+  featurePlans,
   onFeaturePhaseChange,
+  onFeaturePlanChange,
+  onAmbitionChange,
   recommendations,
-  onRecommendationAction,
+  onRecommendationChange,
   onFeatureUpdate,
   onFeatureDelete,
   onAddFeature,
+  scrollToCaseId,
+  highlightCaseId,
+  onNavigateToProject,
+  onScrollHandled,
 }: {
   cluster: ProjectCluster;
   members: UseCase[];
@@ -392,12 +411,13 @@ function ProjectBlock({
   scoreInputs?: Partial<ProjectScoreInputs> | null;
   onScoreChange: (patch: Partial<ProjectScoreInputs>) => void;
   rank: number;
-  projectPlan?: ProjectPlan;
-  onPlanChange: (plan: ProjectPlan) => void;
   featurePhases: Record<string, FeaturePhaseAssignment>;
+  featurePlans: Record<string, ProjectPlan>;
   onFeaturePhaseChange: (caseId: string, assignment: Partial<FeaturePhaseAssignment>) => void;
+  onFeaturePlanChange: (caseId: string, plan: ProjectPlan) => void;
+  onAmbitionChange: (summary: string) => void;
   recommendations: BlaBlaRecommendation[];
-  onRecommendationAction: (recId: string, action: 'approve' | 'reject', reason?: string) => void;
+  onRecommendationChange: (recId: string, patch: Partial<BlaBlaRecommendation>) => void;
   onFeatureUpdate: (caseId: string, updates: { name?: string; description?: string }) => void;
   onFeatureDelete: (caseId: string) => void;
   onAddFeature: (feature: {
@@ -406,6 +426,10 @@ function ProjectBlock({
     priority: FeaturePriority;
     effort: 'xs' | 's' | 'm' | 'l' | 'xl';
   }) => void;
+  scrollToCaseId?: string | null;
+  highlightCaseId?: string | null;
+  onNavigateToProject: (caseId: string) => void;
+  onScrollHandled: () => void;
 }) {
   const accent = projectAccent(cluster.id);
   const horizon =
@@ -416,16 +440,91 @@ function ProjectBlock({
   const depts = deptsInCases(members);
   const [draftName, setDraftName] = useState(cluster.name);
   const [draftSummary, setDraftSummary] = useState(cluster.summary);
-  const priorityDist = calculatePhaseDistribution(
-    members.map((m) => m.id),
-    featurePhases
-  );
+  const [editingAmbition, setEditingAmbition] = useState(false);
   const visibleRecs = recommendations.filter((r) => r.status === 'suggested' || r.status === 'approved');
+  const highRecs = visibleRecs.filter((r) => recommendationPriority(r, featurePhases) === 'high');
+  const laterRecs = visibleRecs.filter((r) => recommendationPriority(r, featurePhases) !== 'high');
+  const highMembers = members.filter(
+    (m) =>
+      normalizeFeaturePriority(featurePhases[m.id]?.priority || featurePhases[m.id]?.phase) ===
+      'high'
+  );
+  const otherMembers = members.filter(
+    (m) =>
+      normalizeFeaturePriority(featurePhases[m.id]?.priority || featurePhases[m.id]?.phase) !==
+      'high'
+  );
 
   useEffect(() => {
     setDraftName(cluster.name);
     setDraftSummary(cluster.summary);
   }, [cluster.name, cluster.summary]);
+
+  useEffect(() => {
+    if (
+      !expanded ||
+      !scrollToCaseId ||
+      (!members.some((m) => m.id === scrollToCaseId) &&
+        !visibleRecs.some((r) => r.id === scrollToCaseId))
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(prioritizeProjectRowId(scrollToCaseId))?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+      onScrollHandled();
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [expanded, scrollToCaseId, members, visibleRecs, onScrollHandled]);
+
+  const projectChip = (m: UseCase, high: boolean, rec?: BlaBlaRecommendation) => {
+    const assignment = rec ? recommendationAssignment(rec, featurePhases) : featurePhases[m.id];
+    const copy = resolveFeatureCopy(m, assignment);
+    const developed = high && hasProjectPlanContent(loadFeaturePlan(m.id, featurePlans));
+    return (
+      <button
+        key={m.id}
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onNavigateToProject(m.id);
+        }}
+        className={`relative rounded-md border px-2 py-1 text-[12px] font-medium transition-all duration-150 ${
+          high
+            ? 'border-solid hover:brightness-125'
+            : 'border-solid border-white/12 bg-white/[0.04] text-white/55 hover:border-white/35 hover:bg-white/[0.09] hover:text-white/90 hover:shadow-[0_0_0_1px_rgba(255,255,255,0.08)]'
+        }`}
+        style={
+          high
+            ? {
+                color: accent,
+                backgroundColor: `color-mix(in srgb, ${accent} 4%, transparent)`,
+                borderColor: developed ? accent : 'transparent',
+              }
+            : undefined
+        }
+      >
+        {high && !developed ? <GappyDashFrame rx={6} strokeColor={accent} /> : null}
+        <span className="inline-flex items-center gap-1.5">
+          {assignment?.handledInClaude === true ? (
+            <img
+              src="/logos/Claude_AI_symbol.svg.webp"
+              alt=""
+              className="h-3 w-3 shrink-0 object-contain opacity-90"
+            />
+          ) : assignment?.handledInClaude === false ? (
+            <img
+              src="/logos/custom.png"
+              alt=""
+              className="h-3 w-3 shrink-0 object-contain opacity-90"
+            />
+          ) : null}
+          {copy.title}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div
@@ -438,9 +537,15 @@ function ProjectBlock({
           type="button"
           onClick={onToggle}
           className="mt-1 shrink-0 text-white/40"
-          aria-label={expanded ? 'Collapse project' : 'Expand project'}
+          aria-label={expanded ? 'Collapse theme' : 'Expand theme'}
         >
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <motion.span
+            animate={{ rotate: expanded ? 90 : 0 }}
+            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </motion.span>
         </button>
         <button
           type="button"
@@ -453,7 +558,7 @@ function ProjectBlock({
           <button type="button" onClick={onToggle} className="w-full text-left">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-white/15 bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/50">
-                #{rank} · Project
+                #{rank} · Agentic theme
               </span>
               {depts.length === 0 ? (
                 <span className="font-mono text-[10px] text-white/25">—</span>
@@ -475,104 +580,113 @@ function ProjectBlock({
             <h3 className="mt-1.5 font-host text-[17px] font-medium text-white md:text-lg">
               {cluster.name}
             </h3>
-            {projectPlan?.problemStatement ? (
-              <p className="mt-1.5 line-clamp-2 text-[12px] leading-relaxed text-white/40">
-                <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
-                  Problem ·{' '}
-                </span>
-                {projectPlan.problemStatement}
-              </p>
-            ) : null}
-            {getSolutionsText(projectPlan) ? (
-              <p className="mt-1 line-clamp-2 text-[12px] leading-relaxed text-white/40">
-                <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
-                  Solution ·{' '}
-                </span>
-                {getSolutionsText(projectPlan)}
-              </p>
-            ) : null}
-            {(members.length > 0 || visibleRecs.length > 0) && (
-              <div className="mt-2 flex flex-wrap gap-1">
-                {members.map((m) => {
-                  const copy = resolveFeatureCopy(m, featurePhases[m.id]);
-                  return (
-                    <span
-                      key={m.id}
-                      className="rounded border border-white/8 bg-white/[0.03] px-1.5 py-0.5 text-[10px] text-white/50"
-                    >
-                      {copy.title}
-                    </span>
-                  );
-                })}
-                {visibleRecs.map((r) => (
-                  <span
-                    key={r.id}
-                    className="rounded border border-amber-400/25 bg-amber-400/10 px-1.5 py-0.5 text-[10px] text-amber-200/80"
-                  >
-                    {r.title}
-                  </span>
-                ))}
-              </div>
-            )}
           </button>
 
-          <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
-              Horizon
-            </span>
-            {ROADMAP_STATUSES.map((s) => {
-              const m = PRIORITY_STATUS_META[s];
-              const active = horizon === s;
-              return (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => onSetHorizon(s)}
-                  className={`rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em] ${
-                    active
-                      ? `${m.border} ${m.bg} ${m.color}`
-                      : 'border-white/10 text-white/35 hover:text-white/60'
-                  }`}
+          <div className="mt-2">
+            {editingAmbition ? (
+              <div className="space-y-2">
+                <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
+                  Ambition
+                </p>
+                <textarea
+                  value={draftSummary}
+                  onChange={(e) => setDraftSummary(e.target.value)}
+                  rows={3}
+                  className="w-full resize-none rounded-lg border border-white/15 bg-[#0a0b0e] px-3 py-2 text-[13px] text-white/80"
+                  placeholder="Overall ambition for this theme — what the nested projects add up to"
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onAmbitionChange(draftSummary.trim());
+                      setEditingAmbition(false);
+                    }}
+                    className="rounded-lg border border-bla-lime/30 bg-bla-lime/10 px-3 py-1 text-[12px] text-bla-lime"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftSummary(cluster.summary);
+                      setEditingAmbition(false);
+                    }}
+                    className="rounded-lg border border-white/10 px-3 py-1 text-[12px] text-white/50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftSummary(cluster.summary);
+                  setEditingAmbition(true);
+                }}
+                className="group flex w-full items-start gap-2 text-left"
+              >
+                <p
+                  className={`flex-1 text-[13px] leading-relaxed ${
+                    expanded ? '' : 'line-clamp-2'
+                  } ${cluster.summary ? 'text-white/45' : 'italic text-white/25'}`}
                 >
-                  {m.short}
-                </button>
-              );
-            })}
+                  <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
+                    Ambition ·{' '}
+                  </span>
+                  {cluster.summary || 'Add the overall objective for this theme'}
+                </p>
+                <Edit2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/20 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {(['high', 'medium', 'low', 'backlog'] as const).map((p) => {
-              const count = priorityDist[p];
-              if (!count) return null;
-              const m = FEATURE_PRIORITY_META[p];
-              return (
-                <span
-                  key={p}
-                  className={`rounded-full border px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] ${m.border} ${m.bg} ${m.color}`}
-                >
-                  {m.short} {count}
-                </span>
-              );
-            })}
-          </div>
+          {(highMembers.length > 0 || otherMembers.length > 0 || visibleRecs.length > 0) && (
+            <div className="mt-2 space-y-1.5">
+              {(highMembers.length > 0 || highRecs.length > 0) && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <span
+                    className="font-mono text-[10px] uppercase tracking-[0.12em]"
+                    style={{ color: accent, opacity: 0.7 }}
+                  >
+                    Projects · High
+                  </span>
+                  {highMembers.map((m) => projectChip(m, true))}
+                  {highRecs.map((r) => projectChip(recommendationAsUseCase(r), true, r))}
+                </div>
+              )}
+              {(otherMembers.length > 0 || laterRecs.length > 0) && (
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
+                    {highMembers.length > 0 || highRecs.length > 0 ? 'Later' : 'Projects'}
+                  </span>
+                  {otherMembers.map((m) => projectChip(m, false))}
+                  {laterRecs.map((r) => projectChip(recommendationAsUseCase(r), false, r))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {expanded && (
-        <div className="space-y-3 border-t border-white/8 px-4 pb-4 pt-3 md:px-5">
+      <CollapseReveal open={expanded} className="space-y-3 border-t border-white/8 px-4 pb-4 pt-3 md:px-5">
           <ProjectPlanPanel
             projectId={cluster.id}
             projectName={cluster.name}
-            plan={projectPlan}
             members={members}
             featurePhases={featurePhases}
+            featurePlans={featurePlans}
             recommendations={recommendations}
-            onPlanChange={onPlanChange}
+            onFeaturePlanChange={onFeaturePlanChange}
             onFeaturePhaseChange={onFeaturePhaseChange}
-            onRecommendationAction={onRecommendationAction}
+            onRecommendationChange={onRecommendationChange}
             onFeatureUpdate={onFeatureUpdate}
             onFeatureDelete={onFeatureDelete}
             onAddFeature={onAddFeature}
+            highlightCaseId={highlightCaseId}
+            scrollToCaseId={scrollToCaseId}
           />
 
           {mode !== 'planning' && (
@@ -638,7 +752,7 @@ function ProjectBlock({
           {mode === 'grouping' && (
             <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
               <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">
-                Edit project
+                Edit theme
               </p>
               <input
                 value={draftName}
@@ -649,7 +763,7 @@ function ProjectBlock({
                   }
                 }}
                 className="w-full rounded-lg border border-white/10 bg-[#0a0b0e] px-3 py-2 text-[14px] text-white"
-                placeholder="Project name"
+                placeholder="Theme name"
               />
               <textarea
                 value={draftSummary}
@@ -661,7 +775,7 @@ function ProjectBlock({
                 }}
                 rows={2}
                 className="w-full resize-none rounded-lg border border-white/10 bg-[#0a0b0e] px-3 py-2 text-[12px] text-white/80"
-                placeholder="Short summary"
+                placeholder="Theme ambition"
               />
               <label className="flex flex-wrap items-center gap-2">
                 <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/35">
@@ -678,7 +792,7 @@ function ProjectBlock({
                   className="rounded-lg border border-white/15 bg-[#0a0b0e] px-2 py-1.5 text-[12px] text-white/85"
                 >
                   <option value="" disabled>
-                    Choose project…
+                    Choose theme…
                   </option>
                   {allClusters
                     .filter((c) => c.id !== cluster.id)
@@ -739,8 +853,7 @@ function ProjectBlock({
             )}
           </div>
           )}
-        </div>
-      )}
+      </CollapseReveal>
     </div>
   );
 }
@@ -757,7 +870,27 @@ export default function PrioritizeView({
   const [metaLoaded, setMetaLoaded] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [scrollToCaseId, setScrollToCaseId] = useState<string | null>(null);
+  const [highlightCaseId, setHighlightCaseId] = useState<string | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
   const initDone = useRef(false);
+
+  const navigateToProject = useCallback((clusterId: string, caseId: string) => {
+    setExpandedId(clusterId);
+    setScrollToCaseId(caseId);
+    setHighlightCaseId(caseId);
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    highlightTimerRef.current = window.setTimeout(() => {
+      setHighlightCaseId(null);
+      highlightTimerRef.current = null;
+    }, 2200);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    };
+  }, []);
 
   const clusters = useMemo(
     () => resolveClusters(meta.clusters, meta.clustersSeedVersion),
@@ -808,32 +941,13 @@ export default function PrioritizeView({
   // NEW: Project Plan, Feature Phase, and Recommendation handlers
   // ══════════════════════════════════════════════════════════════════════════
 
-  const setProjectPlan = useCallback(
-    (projectId: string, plan: ProjectPlan) => {
+  const setFeaturePlan = useCallback(
+    (caseId: string, plan: ProjectPlan) => {
       void persistMeta({
         ...meta,
-        projectPlans: {
-          ...(meta.projectPlans || {}),
-          [projectId]: plan,
-        },
-      });
-    },
-    [meta, persistMeta]
-  );
-
-  const setFeaturePhase = useCallback(
-    (caseId: string, assignment: Partial<FeaturePhaseAssignment>) => {
-      const prev = meta.featurePhases?.[caseId] || {
-        caseId,
-        priority: 'backlog' as const,
-        effort: 'm' as const,
-        approved: false,
-      };
-      void persistMeta({
-        ...meta,
-        featurePhases: {
-          ...(meta.featurePhases || {}),
-          [caseId]: { ...prev, ...assignment, updatedAt: new Date().toISOString() },
+        featurePlans: {
+          ...(meta.featurePlans || {}),
+          [caseId]: plan,
         },
       });
     },
@@ -842,7 +956,10 @@ export default function PrioritizeView({
 
   // Load recommendations from enhanced clusters when meta is loaded
   const loadedRecommendations = useMemo(() => {
-    const result: Record<string, BlaBlaRecommendation> = { ...(meta.recommendations || {}) };
+    const result: Record<string, BlaBlaRecommendation> = {};
+    Object.entries(meta.recommendations || {}).forEach(([id, rec]) => {
+      if (!DROPPED_RECOMMENDATION_TITLES.has(rec.title)) result[id] = rec;
+    });
 
     clusters.forEach((cluster) => {
       const projectRecs = loadRecommendationsForProject(cluster.id, result);
@@ -856,22 +973,41 @@ export default function PrioritizeView({
     return result;
   }, [clusters, meta.recommendations]);
 
-  const handleRecommendationAction = useCallback(
-    (recId: string, action: 'approve' | 'reject', reason?: string) => {
-      const rec =
-        meta.recommendations?.[recId] ?? loadedRecommendations[recId];
-      if (!rec) return;
+  const setFeaturePhase = useCallback(
+    (caseId: string, assignment: Partial<FeaturePhaseAssignment>) => {
+      const hydrated = initializeFeaturePhases(useCases, meta.featurePhases || {});
+      const rec = loadedRecommendations[caseId];
+      const prev =
+        hydrated[caseId] ||
+        (rec
+          ? recommendationAssignment(rec, meta.featurePhases || {})
+          : {
+              caseId,
+              priority: 'backlog' as const,
+              effort: 'm' as const,
+              approved: false,
+            });
+      void persistMeta({
+        ...meta,
+        featurePhases: {
+          ...(meta.featurePhases || {}),
+          [caseId]: { ...prev, ...assignment, updatedAt: new Date().toISOString() },
+        },
+      });
+    },
+    [meta, persistMeta, useCases, loadedRecommendations]
+  );
 
-      const updated =
-        action === 'approve'
-          ? approveRecommendation(rec)
-          : rejectRecommendation(rec, reason);
+  const handleRecommendationChange = useCallback(
+    (recId: string, patch: Partial<BlaBlaRecommendation>) => {
+      const rec = meta.recommendations?.[recId] ?? loadedRecommendations[recId];
+      if (!rec) return;
 
       void persistMeta({
         ...meta,
         recommendations: {
           ...(meta.recommendations || {}),
-          [recId]: updated,
+          [recId]: { ...rec, ...patch },
         },
       });
     },
@@ -889,18 +1025,76 @@ export default function PrioritizeView({
       const loaded = await loadPrioritizeMeta(sessionId);
       if (cancelled) return;
       let next = loaded;
+      const seededPlans = { ...(loaded.featurePlans || {}) };
+      let seededAny = false;
+      const planSeedStale =
+        (loaded.featurePlanSeedVersion ?? 0) < FEATURE_PLAN_SEED_VERSION;
+      for (const [caseId, seed] of Object.entries(FEATURE_PLAN_SEEDS)) {
+        if (planSeedStale || !hasProjectPlanContent(seededPlans[caseId])) {
+          seededPlans[caseId] = { ...seed, updatedAt: new Date().toISOString() };
+          seededAny = true;
+        }
+      }
+      if (seededAny) {
+        next = {
+          ...next,
+          featurePlans: seededPlans,
+          featurePlanSeedVersion: FEATURE_PLAN_SEED_VERSION,
+        };
+      }
+      const effortSeedStale =
+        (loaded.featureEffortSeedVersion ?? 0) < FEATURE_EFFORT_SEED_VERSION;
+      if (effortSeedStale) {
+        next = {
+          ...next,
+          featurePhases: applyFeatureEffortSeeds(next.featurePhases || {}),
+          featureEffortSeedVersion: FEATURE_EFFORT_SEED_VERSION,
+        };
+      }
       // Refresh seed titles into draft once when version bumps
       if (
         loaded.clusters?.length &&
         (!loaded.clustersSeedVersion || loaded.clustersSeedVersion < CLUSTERS_SEED_VERSION)
       ) {
         const refreshed = resolveClusters(loaded.clusters, loaded.clustersSeedVersion);
+        const recs = { ...(loaded.recommendations || {}) };
+        Object.keys(recs).forEach((id) => {
+          if (DROPPED_RECOMMENDATION_TITLES.has(recs[id].title)) {
+            delete recs[id];
+            return;
+          }
+          if (
+            recs[id].projectId === 'partner-activation' ||
+            recs[id].projectId === 'crm-platform'
+          ) {
+            recs[id] = { ...recs[id], projectId: 'partner-intelligence' };
+          }
+        });
+        const scores = { ...(loaded.projectScores || {}) };
+        if (scores['partner-activation'] || scores['crm-platform']) {
+          scores['partner-intelligence'] = {
+            ...scores['partner-activation'],
+            ...scores['crm-platform'],
+            ...scores['partner-intelligence'],
+          };
+          delete scores['partner-activation'];
+          delete scores['crm-platform'];
+        }
         next = {
-          ...loaded,
+          ...next,
           clusters: refreshed,
+          recommendations: recs,
+          projectScores: scores,
           clustersSeedVersion: CLUSTERS_SEED_VERSION,
           clustersUpdatedAt: new Date().toISOString(),
         };
+      }
+      if (
+        seededAny ||
+        effortSeedStale ||
+        (loaded.clusters?.length &&
+          (!loaded.clustersSeedVersion || loaded.clustersSeedVersion < CLUSTERS_SEED_VERSION))
+      ) {
         void savePrioritizeMeta(sessionId, next);
       }
       setMeta(next);
@@ -992,6 +1186,14 @@ export default function PrioritizeView({
   };
 
   const handleFeatureUpdate = (caseId: string, updates: { name?: string; description?: string }) => {
+    const rec = loadedRecommendations[caseId];
+    if (rec) {
+      handleRecommendationChange(caseId, {
+        title: updates.name ?? rec.title,
+        description: updates.description ?? rec.description,
+      });
+      return;
+    }
     const uc = useCases.find((u) => u.id === caseId);
     if (!uc) return;
     onUpdate({
@@ -1064,6 +1266,23 @@ export default function PrioritizeView({
   };
 
   const handleDeleteFeature = (caseId: string, clusterId: string) => {
+    const rec = loadedRecommendations[caseId];
+    if (rec) {
+      const nextPhases = { ...(meta.featurePhases || {}) };
+      delete nextPhases[caseId];
+      const nextPlans = { ...(meta.featurePlans || {}) };
+      delete nextPlans[caseId];
+      void persistMeta({
+        ...meta,
+        featurePhases: nextPhases,
+        featurePlans: nextPlans,
+        recommendations: {
+          ...(meta.recommendations || {}),
+          [caseId]: { ...rec, status: 'rejected' },
+        },
+      });
+      return;
+    }
     const nextClusters = clusters.map((c) =>
       c.id === clusterId
         ? { ...c, caseIds: c.caseIds.filter((id) => id !== caseId) }
@@ -1090,14 +1309,14 @@ export default function PrioritizeView({
 
   if (!metaLoaded) {
     return (
-      <div className="mx-auto w-full max-w-[1100px] py-16 text-center text-white/40">
+      <div className="mx-auto w-full max-w-[1100px] py-16 text-center text-white/40 [zoom:1.15]">
         Loading prioritize…
       </div>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1100px]">
+    <div className="mx-auto w-full max-w-[1100px] [zoom:1.15]">
       <button
         type="button"
         onClick={onBack}
@@ -1112,14 +1331,18 @@ export default function PrioritizeView({
           § prioritize · internal
         </p>
         <h2 className="mt-1 font-host text-2xl font-light text-white md:text-3xl">Prioritize</h2>
+        <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-white/45">
+          Themes hold the overall ambition. High-priority items underneath are the projects we
+          develop next — start small, fill their briefs one by one.
+        </p>
       </div>
 
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/35">
-          Projects
+          Agentic themes
         </p>
         <p className="font-mono text-[10px] text-white/30">
-          {rankedProjects.length} projects
+          {rankedProjects.length} themes
         </p>
       </div>
 
@@ -1144,7 +1367,7 @@ export default function PrioritizeView({
               onMergeInto={(intoId) => {
                 if (
                   !window.confirm(
-                    `Merge “${cluster.name}” into the selected project? Cases move over; this project is removed.`
+                    `Merge “${cluster.name}” into the selected theme? Projects move over; this theme is removed.`
                   )
                 ) {
                   return;
@@ -1155,17 +1378,24 @@ export default function PrioritizeView({
               scoreInputs={meta.projectScores?.[cluster.id]}
               onScoreChange={(patch) => setProjectScore(cluster.id, patch)}
               rank={index + 1}
-              projectPlan={loadProjectPlan(cluster.id, meta.projectPlans)}
-              onPlanChange={(plan) => setProjectPlan(cluster.id, plan)}
               featurePhases={featurePhases}
+              featurePlans={meta.featurePlans || {}}
               onFeaturePhaseChange={setFeaturePhase}
+              onFeaturePlanChange={setFeaturePlan}
+              onAmbitionChange={(summary) =>
+                persistClusters(updateProjectFields(clusters, cluster.id, { summary }))
+              }
               recommendations={Object.values(loadedRecommendations).filter(
                 (r) => r.projectId === cluster.id
               )}
-              onRecommendationAction={handleRecommendationAction}
+              onRecommendationChange={handleRecommendationChange}
               onFeatureUpdate={handleFeatureUpdate}
               onFeatureDelete={(caseId) => handleDeleteFeature(caseId, cluster.id)}
               onAddFeature={(feature) => handleAddFeature(cluster.id, feature)}
+              scrollToCaseId={expandedId === cluster.id ? scrollToCaseId : null}
+              highlightCaseId={highlightCaseId}
+              onNavigateToProject={(caseId) => navigateToProject(cluster.id, caseId)}
+              onScrollHandled={() => setScrollToCaseId(null)}
             />
           );
         })}
