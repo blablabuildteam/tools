@@ -221,7 +221,7 @@ export const DELIVERY_SUGGESTIONS: Record<
   },
   ytfkqqwj: {
     deliveryPartners: ['adsomnia', 'blablabuild'],
-    note: 'MB performance reporting — ScaleWizard/export briefs.',
+    note: 'MB performance reporting — Looker Studio feed, custom desk, Slack.',
   },
   jj12rux9: {
     deliveryPartners: ['adsomnia'],

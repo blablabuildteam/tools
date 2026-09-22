@@ -136,7 +136,7 @@ export const FEATURE_TRANSFORMS: Record<string, FeatureTransform> = {
   ytfkqqwj: {
     title: 'MB performance reporting automation',
     description:
-      'Combine ScaleWizard/exports with Claude to produce faster performance insights and analysis packs for media buying.',
+      'Custom desk on the Looker Studio dataset: daily packs for media buying, weekly packs for leadership, a trained anomaly agent, and Slack when something needs a human. ScaleWizard stays a Studio feeder — no export-into-Claude loop.',
   },
   '1y16z6b7': {
     title: 'Performance drop alarming',
