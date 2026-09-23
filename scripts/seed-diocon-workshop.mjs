@@ -48,6 +48,7 @@ function step(partial, order) {
     title: partial.title,
     description: partial.description || "",
     duration: partial.duration || "",
+    durationUnit: partial.durationUnit || "minutes",
     people: partial.people || [],
     parties: partial.parties || [],
     tools: partial.tools || [],
@@ -514,7 +515,13 @@ async function seedOne(sessionId) {
             .replace(/\s*[—–-]\s*(tijd\s+)?xx\s*min[^.]*$/i, "")
             .replace(/\s*[—–-]\s*tijd\s+xx[^.]*$/i, "")
             .trim();
-          return { ...s, duration, description, painPoint: false };
+          return {
+            ...s,
+            duration,
+            description,
+            durationUnit: s.durationUnit === "hours" ? "hours" : "minutes",
+            painPoint: false,
+          };
         })
       : [];
     sketch = {
@@ -551,7 +558,7 @@ async function seedOne(sessionId) {
         body: [
           "Dit bord is jullie procesplaat. De kolommen bovenaan zijn de kerprocessen (Project setup, Uren, Berekeningen, Modeleren).",
           "Per kolom staan de stappen zoals we die nu kennen uit jullie prep — corrigeer, schrap of voeg toe wat klopt.",
-          "Vul tijd in (minuten of uren — schakel bovenaan), plus wie en welk systeem.",
+          "Vul tijd in per stap (min of uur via het dropdownje), plus wie en welk systeem.",
         ],
         expect: ["Titel", "Wat gebeurt er", "Tijd", "Wie", "Tools / systeem"],
       },

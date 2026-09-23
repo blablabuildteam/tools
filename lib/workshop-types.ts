@@ -430,6 +430,8 @@ export type PrepStep = {
   title: string;
   description: string;
   duration: string;
+  /** How `duration` is interpreted for this step. Default hours. */
+  durationUnit?: DurationUnit;
   /** Internal people. */
   people: string[];
   /** External parties. */
@@ -584,6 +586,10 @@ export function normalizePrepStep(step: PrepStep & {
     title: step.title ?? "",
     description: step.description ?? "",
     duration: step.duration ?? "",
+    durationUnit:
+      step.durationUnit === "minutes" || step.durationUnit === "hours"
+        ? step.durationUnit
+        : undefined,
     people,
     parties,
     tools: asChipList(step.tools),
@@ -652,9 +658,17 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
           order: typeof m.order === "number" ? m.order : i,
         }))
       : createDefaultPrepMilestones();
+  const defaultUnit: DurationUnit = doc.durationUnit === "minutes" ? "minutes" : "hours";
   return {
     type: "prep-phase-v1",
-    steps: doc.steps.map(normalizePrepStep),
+    steps: doc.steps.map((raw) => {
+      const step = normalizePrepStep(raw);
+      const rawUnit = (raw as PrepStep).durationUnit;
+      if (rawUnit !== "minutes" && rawUnit !== "hours") {
+        step.durationUnit = defaultUnit;
+      }
+      return step;
+    }),
     connections: doc.connections,
     aiIdeas: Array.isArray(doc.aiIdeas) ? doc.aiIdeas : createDefaultSophistaAiIdeas(),
     milestones,
@@ -665,6 +679,6 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
     revealedAiMilestoneIds: Array.isArray(doc.revealedAiMilestoneIds)
       ? doc.revealedAiMilestoneIds.map(String).filter(Boolean)
       : [],
-    durationUnit: doc.durationUnit === "minutes" ? "minutes" : "hours",
+    durationUnit: defaultUnit,
   };
 }

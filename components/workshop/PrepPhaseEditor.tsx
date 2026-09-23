@@ -145,8 +145,9 @@ type EditorCtx = {
   showAiKansen: boolean;
   revealedAiMilestoneIds: string[];
   toggleAiColumn: (milestoneId: PrepMilestoneId) => void;
-  durationUnit: DurationUnit;
   hidePainPoints: boolean;
+  /** Default unit for newly added steps. */
+  defaultDurationUnit: DurationUnit;
 };
 
 const EditorContext = createContext<EditorCtx | null>(null);
@@ -162,23 +163,34 @@ function parseDuration(raw: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function formatDuration(n: number, unit: DurationUnit): string {
-  if (n <= 0) return unit === "minutes" ? "0 min" : "0 uur";
-  if (unit === "minutes") {
-    const label = Number.isInteger(n) ? String(Math.round(n)) : String(Math.round(n * 10) / 10).replace(".", ",");
-    return `${label} min`;
-  }
-  const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
-  return `${label} uur`;
+function durationAsHours(raw: string, unit: DurationUnit = "hours"): number {
+  const n = parseDuration(raw);
+  if (n <= 0) return 0;
+  return unit === "minutes" ? n / 60 : n;
 }
 
-function formatDurationCompact(n: number, unit: DurationUnit): string {
-  if (n <= 0) return "0";
-  if (unit === "minutes") {
-    return Number.isInteger(n) ? `${Math.round(n)}m` : `${String(Math.round(n * 10) / 10).replace(".", ",")}m`;
-  }
-  const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
-  return `${label}u`;
+/** Totals / badges when steps mix min and hours — always based on hours. */
+function formatTimeTotal(hours: number): string {
+  if (hours <= 0) return "0 min";
+  const mins = Math.round(hours * 60);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return h === 1 ? "1 uur" : `${h} uur`;
+  return `${h} u ${m} min`;
+}
+
+function formatTimeCompact(hours: number): string {
+  if (hours <= 0) return "0";
+  const mins = Math.round(hours * 60);
+  if (mins < 60) return `${mins}m`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `${h}u` : `${h}u${m}`;
+}
+
+function stepUnit(step: { durationUnit?: DurationUnit }): DurationUnit {
+  return step.durationUnit === "minutes" ? "minutes" : "hours";
 }
 
 function convertDurationValue(raw: string, from: DurationUnit, to: DurationUnit): string {
@@ -510,7 +522,7 @@ function LaneNode({ data }: NodeProps<Node<LaneData>>) {
 }
 
 function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
-  const { hoursByMilestone, durationUnit } = useEditor();
+  const { hoursByMilestone } = useEditor();
   const gid = useId().replace(/:/g, "");
   const ids = data.milestoneIds;
   const hours = useAnimatedHours(ids, hoursByMilestone);
@@ -535,28 +547,23 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
       : points.length === 1
         ? `${line} L ${points[0].x + 36} ${plotBottom} L ${points[0].x - 36} ${plotBottom} Z`
         : `${line} L ${points[points.length - 1].x} ${plotBottom} L ${points[0].x} ${plotBottom} Z`;
-  const unitLabel = durationUnit === "minutes" ? "Minuten" : "Uren";
-  const emptyHint =
-    durationUnit === "minutes"
-      ? "Vul minuten in bij de stappen om te zien waar de inzet zit"
-      : "Vul uren in bij de stappen om te zien waar de inzet zit";
 
   return (
     <div
       className="pointer-events-none relative overflow-hidden rounded-2xl bg-[#151f28] shadow-sm ring-1 ring-black/10"
       style={{ width, height: HOURS_BAND_H }}
-      aria-label={`${unitLabel} per proces, ${formatDuration(total, durationUnit)} totaal`}
+      aria-label={`Tijd per proces, ${formatTimeTotal(total)} totaal`}
     >
       <div className="absolute inset-x-3 top-2 z-10 flex items-center justify-between gap-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ceff00]/80">
-          {unitLabel} over het proces
+          Tijd over het proces
         </p>
         <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[11px] font-semibold text-[#151f28]">
-          {formatDuration(total, durationUnit)} totaal
+          {formatTimeTotal(total)} totaal
         </p>
       </div>
       <AnimatePresence>
-        {total < 0.05 ? (
+        {total < 0.008 ? (
           <motion.p
             key="hours-empty"
             initial={{ opacity: 0 }}
@@ -565,7 +572,7 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
             transition={{ duration: 0.22 }}
             className="absolute inset-x-0 top-[52px] text-center text-[11px] text-white/35"
           >
-            {emptyHint}
+            Vul tijd in bij de stappen om te zien waar de inzet zit
           </motion.p>
         ) : null}
       </AnimatePresence>
@@ -635,7 +642,7 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
                   fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
                   fontWeight="600"
                 >
-                  {formatDurationCompact(p.hours, durationUnit)}
+                  {formatTimeCompact(p.hours)}
                 </text>
               </g>
             );
@@ -673,7 +680,6 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
     patchMilestone,
     requestDeleteMilestone,
     canDeleteMilestone,
-    durationUnit,
     hidePainPoints,
   } = useEditor();
   const boxRef = useReportHeight(id);
@@ -712,7 +718,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
             </p>
           )}
           <p className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-[11px] text-white/75">
-            {formatDuration(hours, durationUnit)}
+            {formatTimeTotal(hours)}
           </p>
           {canDeleteMilestone ? (
             <button
@@ -932,15 +938,14 @@ function handleClass(kind: "source" | "target") {
 }
 
 function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
-  const { patchStep, deleteStep, durationUnit, hidePainPoints } = useEditor();
+  const { patchStep, deleteStep, hidePainPoints } = useEditor();
   const boxRef = useReportHeight(id);
   const isPain = !hidePainPoints && data.painPoint === true;
   const collapsed = data.collapsed === true;
+  const unit = stepUnit(data);
   const { leaving, exit } = useExitThen(() => deleteStep(id));
   const metaBits = [
-    data.duration
-      ? `${data.duration}${durationUnit === "minutes" ? " min" : " u"}`
-      : null,
+    data.duration ? `${data.duration}${unit === "minutes" ? " min" : " u"}` : null,
     ...asChipList(data.tools).slice(0, 2),
   ].filter(Boolean);
 
@@ -1070,14 +1075,12 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
           <div className="mt-2 space-y-1.5 border-t border-black/6 pt-2">
             <label className="flex min-w-0 items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
-              <span className="sr-only">
-                Duur in {durationUnit === "minutes" ? "minuten" : "uren"}
-              </span>
+              <span className="sr-only">Duur</span>
               <span className="flex items-baseline gap-1">
                 <input
                   type="number"
                   min={0}
-                  step={durationUnit === "minutes" ? 1 : 0.5}
+                  step={unit === "minutes" ? 1 : 0.5}
                   inputMode="decimal"
                   value={data.duration}
                   onChange={(e) => patchStep(id, { duration: e.target.value })}
@@ -1085,9 +1088,22 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
                   className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
                 />
-                <span className="text-[13px] text-[#151f28]/45">
-                  {durationUnit === "minutes" ? "min" : "uur"}
-                </span>
+                <select
+                  value={unit}
+                  onChange={(e) => {
+                    const next = e.target.value === "minutes" ? "minutes" : "hours";
+                    if (next === unit) return;
+                    patchStep(id, {
+                      durationUnit: next,
+                      duration: convertDurationValue(data.duration, unit, next),
+                    });
+                  }}
+                  className="nodrag nowheel rounded-md border border-black/10 bg-[#f7f6f2] px-1.5 py-0.5 text-[12px] font-medium text-[#151f28]/75 outline-none"
+                  aria-label="Tijdseenheid"
+                >
+                  <option value="minutes">min</option>
+                  <option value="hours">uur</option>
+                </select>
               </span>
             </label>
             <ChipInput
@@ -2132,6 +2148,7 @@ function FlowCanvas({
             title: "",
             description: "",
             duration: "",
+            durationUnit: durationUnitRef.current,
             people: [],
             parties: [],
             tools: [],
@@ -2367,7 +2384,8 @@ function FlowCanvas({
     const totals = {} as Record<PrepMilestoneId, number>;
     for (const m of milestones) totals[m.id] = 0;
     for (const step of stepList) {
-      totals[step.milestoneId] = (totals[step.milestoneId] ?? 0) + parseDuration(step.duration);
+      totals[step.milestoneId] =
+        (totals[step.milestoneId] ?? 0) + durationAsHours(step.duration, stepUnit(step));
     }
     return totals;
   }, [milestones, stepList]);
@@ -2447,26 +2465,6 @@ function FlowCanvas({
     [persist, pushHistory]
   );
 
-  const setDurationUnit = useCallback(
-    (next: DurationUnit) => {
-      const prev = durationUnitRef.current;
-      if (prev === next) return;
-      pushHistory("duration-unit");
-      setStepList((list) => {
-        const converted = list.map((step) => ({
-          ...step,
-          duration: convertDurationValue(step.duration, prev, next),
-        }));
-        stepsRef.current = converted;
-        return converted;
-      });
-      durationUnitRef.current = next;
-      setDurationUnitState(next);
-      persist("durationUnit", "steps");
-    },
-    [persist, pushHistory]
-  );
-
   const ctx = useMemo<EditorCtx>(
     () => ({
       patchStep,
@@ -2495,8 +2493,8 @@ function FlowCanvas({
       deleteSticky,
       deleteConnection,
       chipSuggestions,
-      durationUnit,
       hidePainPoints,
+      defaultDurationUnit: durationUnit,
     }),
     [
       addAi,
@@ -2813,30 +2811,6 @@ function FlowCanvas({
             >
               Uitklappen
             </button>
-            <div className="pointer-events-auto inline-flex items-center rounded-full bg-white p-0.5 text-[11px] font-semibold shadow-lg ring-1 ring-black/10">
-              <button
-                type="button"
-                onClick={() => setDurationUnit("minutes")}
-                className={`rounded-full px-2.5 py-1 transition ${
-                  durationUnit === "minutes"
-                    ? "bg-[#151f28] text-white"
-                    : "text-[#151f28]/55 hover:text-[#151f28]"
-                }`}
-              >
-                Min
-              </button>
-              <button
-                type="button"
-                onClick={() => setDurationUnit("hours")}
-                className={`rounded-full px-2.5 py-1 transition ${
-                  durationUnit === "hours"
-                    ? "bg-[#151f28] text-white"
-                    : "text-[#151f28]/55 hover:text-[#151f28]"
-                }`}
-              >
-                Uur
-              </button>
-            </div>
             {!hideAiToggle ? (
               <button
                 type="button"
