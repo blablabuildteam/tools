@@ -403,7 +403,7 @@ function layoutNodes(
       connectable: false,
       ...flowBox(STEP_W, ADD_H, { zIndex: 4 }),
     });
-    y += ADD_H + 8;
+    y += ADD_H + STEP_GAP;
     const aiOpen = isAiOpen(m.id, showAiKansen, revealedIds);
     columnNodes.push({
       id: `reveal-ai-${m.id}`,
@@ -415,7 +415,7 @@ function layoutNodes(
       connectable: false,
       ...flowBox(STEP_W, REVEAL_H, { zIndex: 4 }),
     });
-    y += REVEAL_H + (aiOpen ? 8 : LANE_PAD);
+    y += REVEAL_H + (aiOpen ? STEP_GAP : LANE_PAD);
     if (aiOpen) {
       ideas.forEach((idea) => {
         const ideaH = measured(heights, idea.id, AI_H);
@@ -950,7 +950,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
   ].filter(Boolean);
 
   return (
-    <div ref={boxRef} className="prep-pop-in w-[272px]">
+    <div ref={boxRef} className="prep-pop-in" style={{ width: STEP_W }}>
     <div
       className={`prep-card rounded-xl border px-3.5 shadow-sm ${
         collapsed ? "py-2.5" : "py-3"
@@ -963,10 +963,10 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
       <Handle type="source" position={Position.Right} id="r" className={handleClass("source")} />
       <Handle type="source" position={Position.Bottom} id="b" className={handleClass("source")} />
 
-      <div className="flex items-start gap-1.5">
+      <div className={`flex gap-1.5 ${collapsed ? "items-center" : "items-start"}`}>
         <button
           type="button"
-          className="step-drag mt-0.5 cursor-grab rounded p-0.5 text-[#151f28]/30 hover:text-[#151f28]/70"
+          className={`step-drag cursor-grab rounded p-0.5 text-[#151f28]/30 hover:text-[#151f28]/70 ${collapsed ? "" : "mt-0.5"}`}
           aria-label="Sleep stap"
         >
           <GripVertical className="h-4 w-4" />
@@ -977,7 +977,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
             e.stopPropagation();
             patchStep(id, { collapsed: !collapsed });
           }}
-          className="nodrag mt-0.5 rounded p-0.5 text-[#151f28]/35 hover:text-[#151f28]/75"
+          className={`nodrag rounded p-0.5 text-[#151f28]/35 hover:text-[#151f28]/75 ${collapsed ? "" : "mt-0.5"}`}
           aria-label={collapsed ? "Uitklappen" : "Inklappen"}
           title={collapsed ? "Uitklappen" : "Inklappen"}
         >
@@ -1148,7 +1148,10 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
 
 function AddStepNode(_props: NodeProps<Node<AddData>>) {
   return (
-    <div className="nodrag flex h-[44px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/20 bg-white text-[12px] font-semibold text-[#151f28]/70 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#151f28]/[0.03]">
+    <div
+      className="nodrag flex h-[44px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/20 bg-white text-[12px] font-semibold text-[#151f28]/70 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#151f28]/[0.03]"
+      style={{ width: STEP_W }}
+    >
       <Plus className="h-3.5 w-3.5" /> Stap toevoegen
     </div>
   );
@@ -1156,10 +1159,10 @@ function AddStepNode(_props: NodeProps<Node<AddData>>) {
 
 function RevealAiNode({ data }: NodeProps<Node<RevealData>>) {
   return (
-    <div className="nodrag flex h-[52px] w-[252px] flex-col justify-end">
-      <div className="mx-3 h-px bg-[#151f28]/15" />
+    <div className="nodrag flex flex-col justify-end gap-2" style={{ width: STEP_W, height: REVEAL_H }}>
+      <div className="h-px w-full bg-[#151f28]/10" />
       <div
-        className={`mt-2 flex h-[36px] items-center justify-center gap-1.5 rounded-xl text-[11px] font-semibold transition-colors duration-200 ${
+        className={`flex h-[36px] w-full items-center justify-center gap-1.5 rounded-xl text-[11px] font-semibold transition-colors duration-200 ${
           data.open
             ? "bg-white text-[#151f28]/55 ring-1 ring-black/10 hover:bg-[#151f28]/[0.03]"
             : "bg-[#ceff00] text-[#151f28] shadow-sm hover:bg-[#d8ff33]"
@@ -1181,9 +1184,9 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
   const { leaving, exit } = useExitThen(() => deleteAi(id));
 
   return (
-    <div ref={boxRef} className="prep-pop-in w-[252px]">
+    <div ref={boxRef} className="prep-pop-in" style={{ width: STEP_W }}>
     <div
-      className={`prep-card rounded-xl border px-3 py-2.5 shadow-sm ${
+      className={`prep-card rounded-xl border px-3.5 py-3 shadow-sm ${
         leaving ? "is-leaving" : ""
       } ${
         selected
@@ -1191,7 +1194,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
           : "border-[#ceff00]/80 bg-[#f3ff9a]"
       }`}
     >
-      <div className="flex items-start gap-1">
+      <div className="flex items-start gap-1.5">
         <button
           type="button"
           className="ai-drag mt-0.5 cursor-grab rounded p-0.5 text-[#151f28]/35 hover:text-[#151f28]/70"
@@ -1207,7 +1210,7 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
             </span>
             {data.known && (
               <span className="rounded-full bg-[#151f28]/10 px-1.5 py-px text-[9px] font-semibold text-[#151f28]/70">
-                Sophista
+                Bekend
               </span>
             )}
           </div>
@@ -1248,7 +1251,10 @@ function AiIdeaNode({ id, data, selected }: NodeProps<Node<PrepAiIdea>>) {
 
 function AddAiNode(_props: NodeProps<Node<AddData>>) {
   return (
-    <div className="nodrag flex h-[36px] w-[252px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-[#ceff00]/35 text-[11px] font-semibold text-[#151f28]/75 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#ceff00]/50">
+    <div
+      className="nodrag flex h-[36px] items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-[#ceff00]/35 text-[11px] font-semibold text-[#151f28]/75 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-[#ceff00]/50"
+      style={{ width: STEP_W }}
+    >
       <Sparkles className="h-3.5 w-3.5" /> AI-kans
     </div>
   );
