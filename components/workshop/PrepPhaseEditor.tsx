@@ -1830,7 +1830,7 @@ function FlowCanvas({
 
   const structureKey = [
     milestones.map((m) => `${m.id}:${m.order}`).join("|"),
-    stepList.map((s) => `${s.id}:${s.milestoneId}:${s.order}`).join("|"),
+    stepList.map((s) => `${s.id}:${s.milestoneId}:${s.order}:${s.collapsed ? "c" : "o"}`).join("|"),
     aiList.map((a) => `${a.id}:${a.milestoneId}:${a.order}`).join("|"),
     stickyList.map((s) => s.id).join("|"),
     showAiKansen ? "ai-on" : "ai-off",
