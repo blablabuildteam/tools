@@ -611,12 +611,26 @@ export default function WorkshopTool() {
           <div className="hidden h-6 w-px bg-white/10 sm:block" />
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold tracking-tight text-white">
-              {meta?.company || meta?.title || "Process workshop"}
-            </p>
-            <p className="truncate font-mono text-[10px] text-white/30">
-              {meta?.title && meta?.company ? meta.title : sessionId}
-            </p>
+            <div className="flex min-w-0 items-center gap-2.5">
+              {meta?.logo ? (
+                <span className="inline-flex shrink-0 items-center rounded-md bg-white px-2 py-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={meta.logo}
+                    alt={meta.company || ""}
+                    className="h-4 w-auto max-w-[88px] object-contain sm:h-[18px] sm:max-w-[110px]"
+                  />
+                </span>
+              ) : null}
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold tracking-tight text-white">
+                  {meta?.company || meta?.title || "Process workshop"}
+                </p>
+                <p className="truncate font-mono text-[10px] text-white/30">
+                  {meta?.title && meta?.company ? meta.title : sessionId}
+                </p>
+              </div>
+            </div>
           </div>
 
           <nav className="flex max-w-[min(100%,420px)] items-center overflow-x-auto rounded-full bg-white/[0.04] p-1 ring-1 ring-white/10 sm:max-w-none">
@@ -673,6 +687,10 @@ export default function WorkshopTool() {
       <div className="relative min-h-0 flex-1 overflow-hidden bg-[#0f1419]">
         <ViewEnter active={tab === "intro"} className="h-full overflow-y-auto">
           <WorkshopIntroView
+            title={meta?.title || "Process workshop"}
+            company={meta?.company || ""}
+            logo={meta?.logo}
+            schedule={meta?.schedule}
             intro={meta?.intro ?? createEmptyIntro()}
             onContinue={openSketch}
           />
@@ -702,7 +720,11 @@ export default function WorkshopTool() {
         </ViewEnter>
 
         <ViewEnter active={tab === "reference"} className="h-full overflow-y-auto">
-          <WorkshopReferenceView sessionId={sessionId} active={tab === "reference"} />
+          <WorkshopReferenceView
+            sessionId={sessionId}
+            active={tab === "reference"}
+            company={meta?.company || ""}
+          />
         </ViewEnter>
 
         <ViewEnter active={tab === "wrap"} className="h-full overflow-y-auto">

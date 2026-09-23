@@ -127,6 +127,10 @@ export type WorkshopMeta = {
   title: string;
   company: string;
   goal: string;
+  /** Optional client wordmark, e.g. `/workshop/diocon/logo.png` */
+  logo?: string;
+  /** Optional schedule line on intro, e.g. `Workshop · processen in kaart` */
+  schedule?: string;
   createdAt: string;
   updatedAt: string;
   passwordProtected: boolean;
@@ -208,6 +212,8 @@ export function createEmptyMeta(partial?: Partial<WorkshopMeta>): WorkshopMeta {
     goal:
       partial?.goal ??
       "Informatie-verzameling versnellen → gestandaardiseerd rapport",
+    logo: partial?.logo,
+    schedule: partial?.schedule,
     createdAt: partial?.createdAt ?? now,
     updatedAt: partial?.updatedAt ?? now,
     passwordProtected: Boolean(partial?.passwordProtected),

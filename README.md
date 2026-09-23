@@ -7,8 +7,9 @@ Interne workshop- en presentatietools.
 ## Tools
 
 - **AI Use Case Matrix** (`/tools/ai-matrix`) — zelfde Upstash KV als blablabuild.com (`ai-matrix:{sessionId}`)
-- **Process Workshop** (`/tools/workshop`) — gestructureerd bord + tldraw-schets (`workshop:{sessionId}`)
-  - Sophista session: `/tools/workshop?s=sophista-dinsdag` — source docs in [`docs/sophista/`](docs/sophista/)
+- **Process Workshop** (`/tools/workshop`) — gestructureerd bord + process-schets (`workshop:{sessionId}`)
+  - Sophista: `/tools/workshop?s=sophista-dinsdag` — [`docs/sophista/`](docs/sophista/)
+  - dioCON: `/tools/workshop?s=diocon-workshop` — [`docs/diocon/`](docs/diocon/)
 
 ## Setup
 

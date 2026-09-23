@@ -11,14 +11,11 @@ type Attendee = {
   photo?: string;
 };
 
-const AGENDA = [
-  "Focus op het huidige proces",
-  "AI-kansen identificeren",
-  "Eerste technische aanpak van een oplossing vormgeven",
-  "Recap en vervolgstappen",
-];
-
 type Props = {
+  title: string;
+  company: string;
+  logo?: string;
+  schedule?: string;
   intro: {
     todayGoal: string;
     discover: string[];
@@ -65,7 +62,39 @@ function AttendeeRow({ attendee }: { attendee: Attendee }) {
   );
 }
 
-export default function WorkshopIntroView({ intro, onContinue }: Props) {
+export default function WorkshopIntroView({
+  title,
+  company,
+  logo,
+  schedule,
+  intro,
+  onContinue,
+}: Props) {
+  const agenda = intro.agenda.length
+    ? intro.agenda
+    : [
+        "Focus op het huidige proces",
+        "AI-kansen identificeren",
+        "Eerste technische aanpak van een oplossing vormgeven",
+        "Recap en vervolgstappen",
+      ];
+
+  const orgs = Array.from(
+    new Set(intro.attendees.map((a) => a.org).filter((o): o is string => Boolean(o)))
+  );
+  if (orgs.length === 0 && company) orgs.push(company);
+  if (!orgs.includes("BlaBlaBuild") && intro.attendees.some((a) => !a.org)) {
+    /* keep single list below */
+  }
+
+  const grouped =
+    orgs.length > 1
+      ? orgs.map((org) => ({
+          org,
+          people: intro.attendees.filter((a) => a.org === org),
+        }))
+      : [{ org: company || "Aanwezig", people: intro.attendees }];
+
   return (
     <div className="h-full overflow-y-auto bg-bla-dark text-white">
       <div className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
@@ -73,56 +102,63 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-bla-lime">
             Workshop intro
           </p>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-white sm:text-4xl">
-            Sophista × blablabuild
+          {logo ? (
+            <div className="mt-5 inline-flex items-center rounded-2xl bg-white px-5 py-3">
+              <Image
+                src={logo}
+                alt={company || "Client"}
+                width={180}
+                height={54}
+                className="h-10 w-auto object-contain sm:h-12"
+                priority
+              />
+            </div>
+          ) : null}
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+            {title || `${company} × blablabuild`}
           </h1>
-          <p className="mt-2 text-sm text-white/55">Dinsdag · 15:00–18:00</p>
+          {schedule ? <p className="mt-2 text-sm text-white/55">{schedule}</p> : null}
         </div>
 
-        <section data-view-item className="mt-10 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-            Aanwezig
-          </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">Sophista</p>
-              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
-                {intro.attendees
-                  .filter((a) => a.org === "Sophista")
-                  .map((a) => (
-                    <AttendeeRow key={a.id} attendee={a} />
-                  ))}
-              </ul>
+        {intro.attendees.length > 0 ? (
+          <section data-view-item className="mt-10 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
+              Aanwezig
+            </h2>
+            <div
+              className={`mt-4 grid gap-4 ${grouped.length > 1 ? "sm:grid-cols-2" : ""}`}
+            >
+              {grouped.map(({ org, people }) =>
+                people.length === 0 ? null : (
+                  <div key={org}>
+                    <p className="text-[11px] uppercase tracking-wider text-white/45">{org}</p>
+                    <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
+                      {people.map((a) => (
+                        <AttendeeRow key={a.id} attendee={a} />
+                      ))}
+                    </ul>
+                  </div>
+                )
+              )}
             </div>
-            <div>
-              <p className="text-[11px] uppercase tracking-wider text-white/45">BlaBlaBuild</p>
-              <ul className="mt-3 space-y-2.5 text-[14px] text-white/90">
-                {intro.attendees
-                  .filter((a) => a.org === "BlaBlaBuild")
-                  .map((a) => (
-                    <AttendeeRow key={a.id} attendee={a} />
-                  ))}
-              </ul>
-            </div>
-          </div>
-        </section>
+          </section>
+        ) : null}
 
-        <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-            Doel vandaag
-          </h2>
-          <p className="mt-3 text-[15px] leading-relaxed text-white/90">{intro.todayGoal}</p>
-        </section>
+        {intro.todayGoal ? (
+          <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
+              Doel vandaag
+            </h2>
+            <p className="mt-3 text-[15px] leading-relaxed text-white/90">{intro.todayGoal}</p>
+          </section>
+        ) : null}
 
         <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
           <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
             Agenda
           </h2>
-          <p className="mt-3 text-[14px] leading-relaxed text-white/60">
-            We hebben 3 uur beschikbaar (15:00–18:00). Waarschijnlijk hebben we niet alle tijd nodig.
-          </p>
           <ol className="mt-4 space-y-2.5">
-            {AGENDA.map((item, index) => (
+            {agenda.map((item, index) => (
               <li
                 key={item}
                 className="flex items-start gap-3 rounded-xl border border-white/8 bg-black/25 px-4 py-3 text-[14px] leading-relaxed text-white/90"
@@ -136,19 +172,21 @@ export default function WorkshopIntroView({ intro, onContinue }: Props) {
           </ol>
         </section>
 
-        <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
-            Wat willen we achterhalen?
-          </h2>
-          <ul className="mt-4 space-y-3">
-            {intro.discover.map((item) => (
-              <li key={item} className="flex gap-3 text-[14px] leading-relaxed text-white/85">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-bla-lime" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {intro.discover.length > 0 ? (
+          <section data-view-item className="mt-5 rounded-2xl border border-white/12 bg-[#1a222c] p-5 sm:p-6">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-bla-lime">
+              Wat willen we achterhalen?
+            </h2>
+            <ul className="mt-4 space-y-3">
+              {intro.discover.map((item) => (
+                <li key={item} className="flex gap-3 text-[14px] leading-relaxed text-white/85">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-bla-lime" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <div data-view-item className="mt-8 flex justify-end">
           <button

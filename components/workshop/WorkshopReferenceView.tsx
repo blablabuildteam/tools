@@ -26,6 +26,7 @@ import {
 type Props = {
   sessionId: string;
   active: boolean;
+  company?: string;
 };
 
 function formatHours(raw: string): string | null {
@@ -43,7 +44,7 @@ function reindexAi(ideas: PrepAiIdea[], milestoneId: PrepMilestoneId): PrepAiIde
   return [...ideas.filter((s) => s.milestoneId !== milestoneId), ...col];
 }
 
-export default function WorkshopReferenceView({ sessionId, active }: Props) {
+export default function WorkshopReferenceView({ sessionId, active, company }: Props) {
   const [doc, setDoc] = useState<PrepPhaseSketch | null>(null);
   const [missing, setMissing] = useState(false);
   const [status, setStatus] = useState("…");
@@ -235,6 +236,7 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
   );
 
   const milestones = [...(doc?.milestones ?? [])].sort((a, b) => a.order - b.order);
+  const showSophistaNaslag = (company || "").toLowerCase().includes("sophista");
 
   return (
     <div ref={rootRef} className="h-full overflow-y-auto bg-[#0f1419] text-white">
@@ -278,37 +280,43 @@ export default function WorkshopReferenceView({ sessionId, active }: Props) {
           ))}
         </div>
 
-        <section data-view-item className="mt-10 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
-            IM-structuur (prompt)
-          </h2>
-          <p className="mt-2 text-sm text-white/45">
-            Als de eerste output richting IM/rapport gaat — dit is hun gewenste slide-opbouw.
-          </p>
-          <ol className="mt-4 columns-1 gap-x-8 space-y-1.5 sm:columns-2">
-            {SOPHISTA_IM_STRUCTURE.map((item, i) => (
-              <li key={item} className="break-inside-avoid text-[13px] text-white/80">
-                <span className="mr-2 font-mono text-white/30">{i + 1}.</span>
-                {item}
-              </li>
-            ))}
-          </ol>
-        </section>
+        {showSophistaNaslag ? (
+          <>
+            <section data-view-item className="mt-10 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
+                IM-structuur (prompt)
+              </h2>
+              <p className="mt-2 text-sm text-white/45">
+                Als de eerste output richting IM/rapport gaat — dit is hun gewenste slide-opbouw.
+              </p>
+              <ol className="mt-4 columns-1 gap-x-8 space-y-1.5 sm:columns-2">
+                {SOPHISTA_IM_STRUCTURE.map((item, i) => (
+                  <li key={item} className="break-inside-avoid text-[13px] text-white/80">
+                    <span className="mr-2 font-mono text-white/30">{i + 1}.</span>
+                    {item}
+                  </li>
+                ))}
+              </ol>
+            </section>
 
-        <section data-view-item className="mt-5 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
-            Later in het verkoopproces
-          </h2>
-          <p className="mt-2 text-sm text-white/45">Kort meenemen voor uitbreidbaarheid — niet bouwen vandaag.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {SOPHISTA_LATER_PHASES.map((p) => (
-              <div key={p.title} className="rounded-xl border border-white/8 bg-black/25 p-4">
-                <p className="text-sm font-semibold">{p.title}</p>
-                <p className="mt-1.5 text-[12px] leading-relaxed text-white/50">{p.items}</p>
+            <section data-view-item className="mt-5 rounded-2xl border border-white/10 bg-[#161d26] p-5 sm:p-6">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#ceff00]">
+                Later in het verkoopproces
+              </h2>
+              <p className="mt-2 text-sm text-white/45">
+                Kort meenemen voor uitbreidbaarheid — niet bouwen vandaag.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {SOPHISTA_LATER_PHASES.map((p) => (
+                  <div key={p.title} className="rounded-xl border border-white/8 bg-black/25 p-4">
+                    <p className="text-sm font-semibold">{p.title}</p>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-white/50">{p.items}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
+            </section>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -413,7 +421,7 @@ function MilestoneBlock({
                     </span>
                     {idea.known && (
                       <span className="rounded-full bg-[#ceff00]/15 px-1.5 py-px text-[9px] font-semibold text-[#ceff00]">
-                        Sophista
+                        Bekend
                       </span>
                     )}
                   </div>
