@@ -53,7 +53,7 @@ const HOURS_BAND_H = 116;
 const ORIGIN_Y = HOURS_BAND_Y + HOURS_BAND_H + 16;
 const HEADER_H = 148;
 const STEP_W = 272;
-const STEP_H = 248;
+const STEP_H = 200;
 const STEP_COLLAPSED_H = 56;
 const STEP_GAP = 8;
 const ADD_H = 44;
@@ -997,10 +997,20 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         ) : (
           <textarea
             value={data.title}
-            onChange={(e) => patchStep(id, { title: e.target.value })}
+            onChange={(e) => {
+              const el = e.currentTarget;
+              patchStep(id, { title: e.target.value });
+              el.style.height = "0px";
+              el.style.height = `${Math.max(24, el.scrollHeight)}px`;
+            }}
+            ref={(el) => {
+              if (!el) return;
+              el.style.height = "0px";
+              el.style.height = `${Math.max(24, el.scrollHeight)}px`;
+            }}
             placeholder="Titel van de stap"
-            rows={2}
-            className="nodrag min-w-0 flex-1 resize-none bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
+            rows={1}
+            className="nodrag min-w-0 flex-1 resize-none overflow-hidden bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
           />
         )}
         {!hidePainPoints && !collapsed ? (
@@ -1034,23 +1044,30 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
 
       {!collapsed ? (
         <>
-          <div className="mt-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/35">
-              Toelichting
-            </p>
-            <p className="mt-0.5 text-[11px] leading-snug text-[#151f28]/40">
-              Wat gebeurt er precies? Sleep de rechteronderhoek om groter te maken.
-            </p>
-            <textarea
-              value={data.description}
-              onChange={(e) => patchStep(id, { description: e.target.value })}
-              placeholder="Bijv. wie doet wat, in welk systeem, wat lever je op…"
-              rows={3}
-              className="nodrag nowheel mt-1.5 min-h-[4.5rem] w-full resize-y bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
-            />
-          </div>
+          <textarea
+            value={data.description}
+            onChange={(e) => {
+              const el = e.currentTarget;
+              patchStep(id, { description: e.target.value });
+              el.style.height = "0px";
+              el.style.height = `${Math.max(28, el.scrollHeight)}px`;
+            }}
+            onFocus={(e) => {
+              const el = e.currentTarget;
+              el.style.height = "0px";
+              el.style.height = `${Math.max(28, el.scrollHeight)}px`;
+            }}
+            ref={(el) => {
+              if (!el) return;
+              el.style.height = "0px";
+              el.style.height = `${Math.max(28, el.scrollHeight)}px`;
+            }}
+            placeholder="Wat gebeurt er precies?"
+            rows={1}
+            className="nodrag nowheel mt-1.5 w-full resize-none overflow-hidden bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
+          />
 
-          <div className="mt-2.5 space-y-2 border-t border-black/6 pt-2.5">
+          <div className="mt-2 space-y-1.5 border-t border-black/6 pt-2">
             <label className="flex min-w-0 items-center gap-1.5">
               <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
               <span className="sr-only">

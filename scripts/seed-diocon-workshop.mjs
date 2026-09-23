@@ -155,7 +155,6 @@ const seedSteps = [
       milestoneId: "project-setup",
       title: "Nieuw project / CRM aanmaken",
       duration: "3",
-      description: "2–3 minuten per keer",
       tools: ["CRM"],
       painPoint: false,
     },
@@ -250,7 +249,6 @@ const seedSteps = [
       milestoneId: "uren",
       title: "Uren invoeren via TSR-plugin in Outlook",
       duration: "10",
-      description: "~10 minuten per week",
       tools: ["TSR", "Outlook"],
     },
     0
@@ -272,7 +270,6 @@ const seedSteps = [
       milestoneId: "uren",
       title: "Controle verkoopfacturen in Exact",
       duration: "1",
-      description: "~1 minuut per factuur",
       tools: ["Exact"],
     },
     2
@@ -282,7 +279,7 @@ const seedSteps = [
       id: "u4",
       milestoneId: "uren",
       title: "Algemene mail archiveren",
-      description: "PST opslaan in map correspondentie — tijd XX per project",
+      description: "PST opslaan in map correspondentie",
       tools: ["Outlook", "Verkenner"],
       formats: ["PST"],
       painPoint: true,
@@ -306,7 +303,6 @@ const seedSteps = [
       milestoneId: "uren",
       title: "Wekelijks mails archiveren (Bob)",
       duration: "20",
-      description: "15–30 min per week",
       people: ["Bob"],
       tools: ["Outlook"],
     },
@@ -317,7 +313,7 @@ const seedSteps = [
       id: "u7",
       milestoneId: "uren",
       title: "Renders maken voor website",
-      description: "Aan de hand van constructieve modellen — XX min per render",
+      description: "Aan de hand van constructieve modellen",
       tools: ["Revit", "Twinmotion"],
       formats: ["Render"],
     },
@@ -329,7 +325,6 @@ const seedSteps = [
       milestoneId: "berekeningen",
       title: "Invoer / uitvoer knippen-plakken",
       duration: "30",
-      description: "Gem. 30 minuten",
       tools: ["Excel", "Word", "PDF"],
       formats: ["Excel", "Word", "PDF"],
       painPoint: true,
@@ -342,7 +337,6 @@ const seedSteps = [
       milestoneId: "berekeningen",
       title: "Gehanteerde belastingen vaststellen",
       duration: "8",
-      description: "Gem. 5–10 minuten",
       tools: ["Excel"],
     },
     1
@@ -490,20 +484,44 @@ async function seedOne(sessionId) {
   let sketch;
   if (keepSketch) {
     const prev = existing.sketch;
-    if (prev?.durationUnit === "minutes" || prev?.durationUnit === "hours") {
-      sketch = prev;
-    } else {
-      // Migrate older hour-based durations → minutes once.
-      const steps = Array.isArray(prev.steps)
-        ? prev.steps.map((s) => {
-            const n = Number(String(s.duration ?? "").trim().replace(",", "."));
-            if (!Number.isFinite(n) || n <= 0) return { ...s, painPoint: false };
-            const mins = Math.round(n * 60);
-            return { ...s, duration: mins > 0 ? String(mins) : "", painPoint: false };
-          })
-        : [];
-      sketch = { ...prev, steps, durationUnit: "minutes" };
-    }
+    const timeOnly = (d) => {
+      const t = String(d || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ");
+      if (!t) return true;
+      return (
+        /^(~?\d+[.,]?\d*\s*[–\-]\s*)?\d+[.,]?\d*\s*min(uut|uten)?(\s+per\s+\w+)?$/.test(t) ||
+        /^~\d+[.,]?\d*\s*min(uut|uten)?(\s+per\s+\w+)?$/.test(t) ||
+        /^gem\.?\s*\d+[.,]?\d*(\s*[–\-]\s*\d+[.,]?\d*)?\s*min(uut|uten)?$/.test(t) ||
+        /^\d+[.,]?\d*\s*[–\-]\s*\d+[.,]?\d*\s*min(\s+per\s+\w+)?$/.test(t)
+      );
+    };
+    const steps = Array.isArray(prev.steps)
+      ? prev.steps.map((s) => {
+          let duration = s.duration ?? "";
+          let description = s.description ?? "";
+          if (!prev.durationUnit || prev.durationUnit === "hours") {
+            const n = Number(String(duration).trim().replace(",", "."));
+            if (Number.isFinite(n) && n > 0 && n < 20) {
+              const mins = Math.round(n * 60);
+              duration = mins > 0 ? String(mins) : "";
+            }
+          }
+          if (timeOnly(description)) description = "";
+          // Strip trailing "— XX min…" fragments
+          description = description
+            .replace(/\s*[—–-]\s*(tijd\s+)?xx\s*min[^.]*$/i, "")
+            .replace(/\s*[—–-]\s*tijd\s+xx[^.]*$/i, "")
+            .trim();
+          return { ...s, duration, description, painPoint: false };
+        })
+      : [];
+    sketch = {
+      ...prev,
+      steps,
+      durationUnit: "minutes",
+    };
   } else {
     sketch = {
       type: "prep-phase-v1",
