@@ -154,7 +154,7 @@ const seedSteps = [
       id: "ps1",
       milestoneId: "project-setup",
       title: "Nieuw project / CRM aanmaken",
-      duration: "0.05",
+      duration: "3",
       description: "2–3 minuten per keer",
       tools: ["CRM"],
       painPoint: false,
@@ -249,7 +249,7 @@ const seedSteps = [
       id: "u1",
       milestoneId: "uren",
       title: "Uren invoeren via TSR-plugin in Outlook",
-      duration: "0.17",
+      duration: "10",
       description: "~10 minuten per week",
       tools: ["TSR", "Outlook"],
     },
@@ -271,7 +271,7 @@ const seedSteps = [
       id: "u3",
       milestoneId: "uren",
       title: "Controle verkoopfacturen in Exact",
-      duration: "0.02",
+      duration: "1",
       description: "~1 minuut per factuur",
       tools: ["Exact"],
     },
@@ -305,7 +305,7 @@ const seedSteps = [
       id: "u6",
       milestoneId: "uren",
       title: "Wekelijks mails archiveren (Bob)",
-      duration: "0.4",
+      duration: "20",
       description: "15–30 min per week",
       people: ["Bob"],
       tools: ["Outlook"],
@@ -328,7 +328,7 @@ const seedSteps = [
       id: "b1",
       milestoneId: "berekeningen",
       title: "Invoer / uitvoer knippen-plakken",
-      duration: "0.5",
+      duration: "30",
       description: "Gem. 30 minuten",
       tools: ["Excel", "Word", "PDF"],
       formats: ["Excel", "Word", "PDF"],
@@ -341,7 +341,7 @@ const seedSteps = [
       id: "b2",
       milestoneId: "berekeningen",
       title: "Gehanteerde belastingen vaststellen",
-      duration: "0.15",
+      duration: "8",
       description: "Gem. 5–10 minuten",
       tools: ["Excel"],
     },
@@ -487,6 +487,37 @@ async function seedOne(sessionId) {
 
   const keepSketch = !resetSketch && Boolean(existing?.sketch);
 
+  let sketch;
+  if (keepSketch) {
+    const prev = existing.sketch;
+    if (prev?.durationUnit === "minutes" || prev?.durationUnit === "hours") {
+      sketch = prev;
+    } else {
+      // Migrate older hour-based durations → minutes once.
+      const steps = Array.isArray(prev.steps)
+        ? prev.steps.map((s) => {
+            const n = Number(String(s.duration ?? "").trim().replace(",", "."));
+            if (!Number.isFinite(n) || n <= 0) return { ...s, painPoint: false };
+            const mins = Math.round(n * 60);
+            return { ...s, duration: mins > 0 ? String(mins) : "", painPoint: false };
+          })
+        : [];
+      sketch = { ...prev, steps, durationUnit: "minutes" };
+    }
+  } else {
+    sketch = {
+      type: "prep-phase-v1",
+      milestones,
+      steps: seedSteps.map((s) => ({ ...s, painPoint: false })),
+      connections: [],
+      aiIdeas: seedAiIdeas,
+      stickies: [],
+      showAiKansen: false,
+      revealedAiMilestoneIds: [],
+      durationUnit: "minutes",
+    };
+  }
+
   const session = {
     meta: {
       title: "dioCON × blablabuild",
@@ -496,14 +527,15 @@ async function seedOne(sessionId) {
       goal: "Kerprocessen in kaart → frictie & tijd → prioriteit #1 automatisering",
       tabs: ["sketch"],
       sketchLabel: "dioCON processen",
+      hidePainPoints: true,
       sketchHelp: {
         title: "Wat gebeurt hier?",
         body: [
           "Dit bord is jullie procesplaat. De kolommen bovenaan zijn de kerprocessen (Project setup, Uren, Berekeningen, Modeleren).",
           "Per kolom staan de stappen zoals we die nu kennen uit jullie prep — corrigeer, schrap of voeg toe wat klopt.",
-          "Markeer pijnpunten met het gezichtje. Vul tijd, wie en tools in waar je het weet.",
+          "Vul tijd in (minuten of uren — schakel bovenaan), plus wie en welk systeem.",
         ],
-        expect: ["Titel", "Wat gebeurt er", "Tijd (uur)", "Wie", "Tools / systeem"],
+        expect: ["Titel", "Wat gebeurt er", "Tijd", "Wie", "Tools / systeem"],
       },
       createdAt: existing?.meta?.createdAt || now,
       updatedAt: now,
@@ -578,18 +610,7 @@ async function seedOne(sessionId) {
             0
           ),
         ],
-    sketch: keepSketch
-      ? existing.sketch
-      : {
-          type: "prep-phase-v1",
-          milestones,
-          steps: seedSteps,
-          connections: [],
-          aiIdeas: seedAiIdeas,
-          stickies: [],
-          showAiKansen: false,
-          revealedAiMilestoneIds: [],
-        },
+    sketch,
     rev: (existing?.rev ?? 0) + 1,
   };
 

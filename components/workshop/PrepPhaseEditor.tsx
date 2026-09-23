@@ -34,6 +34,7 @@ import {
   sketchFingerprint,
   SKETCH_PATCH_KEYS,
   STICKY_COLORS,
+  type DurationUnit,
   type PrepAiIdea,
   type PrepConnection,
   type PrepMilestone,
@@ -142,6 +143,8 @@ type EditorCtx = {
   showAiKansen: boolean;
   revealedAiMilestoneIds: string[];
   toggleAiColumn: (milestoneId: PrepMilestoneId) => void;
+  durationUnit: DurationUnit;
+  hidePainPoints: boolean;
 };
 
 const EditorContext = createContext<EditorCtx | null>(null);
@@ -152,21 +155,42 @@ function useEditor() {
   return ctx;
 }
 
-function parseHours(raw: string): number {
+function parseDuration(raw: string): number {
   const n = Number(String(raw).trim().replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function formatHours(n: number): string {
-  if (n <= 0) return "0 uur";
+function formatDuration(n: number, unit: DurationUnit): string {
+  if (n <= 0) return unit === "minutes" ? "0 min" : "0 uur";
+  if (unit === "minutes") {
+    const label = Number.isInteger(n) ? String(Math.round(n)) : String(Math.round(n * 10) / 10).replace(".", ",");
+    return `${label} min`;
+  }
   const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
   return `${label} uur`;
 }
 
-function formatHoursCompact(n: number): string {
+function formatDurationCompact(n: number, unit: DurationUnit): string {
   if (n <= 0) return "0";
+  if (unit === "minutes") {
+    return Number.isInteger(n) ? `${Math.round(n)}m` : `${String(Math.round(n * 10) / 10).replace(".", ",")}m`;
+  }
   const label = Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace(".", ",");
   return `${label}u`;
+}
+
+function convertDurationValue(raw: string, from: DurationUnit, to: DurationUnit): string {
+  if (from === to) return raw;
+  const n = parseDuration(raw);
+  if (n <= 0) return "";
+  if (from === "hours" && to === "minutes") {
+    const mins = Math.round(n * 60);
+    return mins > 0 ? String(mins) : "";
+  }
+  const hours = n / 60;
+  if (hours <= 0) return "";
+  const rounded = Math.round(hours * 100) / 100;
+  return String(rounded);
 }
 
 function hoursBandWidth(count: number) {
@@ -480,7 +504,7 @@ function LaneNode({ data }: NodeProps<Node<LaneData>>) {
 }
 
 function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
-  const { hoursByMilestone } = useEditor();
+  const { hoursByMilestone, durationUnit } = useEditor();
   const gid = useId().replace(/:/g, "");
   const ids = data.milestoneIds;
   const hours = useAnimatedHours(ids, hoursByMilestone);
@@ -505,19 +529,24 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
       : points.length === 1
         ? `${line} L ${points[0].x + 36} ${plotBottom} L ${points[0].x - 36} ${plotBottom} Z`
         : `${line} L ${points[points.length - 1].x} ${plotBottom} L ${points[0].x} ${plotBottom} Z`;
+  const unitLabel = durationUnit === "minutes" ? "Minuten" : "Uren";
+  const emptyHint =
+    durationUnit === "minutes"
+      ? "Vul minuten in bij de stappen om te zien waar de inzet zit"
+      : "Vul uren in bij de stappen om te zien waar de inzet zit";
 
   return (
     <div
       className="pointer-events-none relative overflow-hidden rounded-2xl bg-[#151f28] shadow-sm ring-1 ring-black/10"
       style={{ width, height: HOURS_BAND_H }}
-      aria-label={`Uren per milestone, ${formatHours(total)} totaal`}
+      aria-label={`${unitLabel} per proces, ${formatDuration(total, durationUnit)} totaal`}
     >
       <div className="absolute inset-x-3 top-2 z-10 flex items-center justify-between gap-3">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#ceff00]/80">
-          Uren over het proces
+          {unitLabel} over het proces
         </p>
         <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[11px] font-semibold text-[#151f28]">
-          {formatHours(total)} totaal
+          {formatDuration(total, durationUnit)} totaal
         </p>
       </div>
       <AnimatePresence>
@@ -530,7 +559,7 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
             transition={{ duration: 0.22 }}
             className="absolute inset-x-0 top-[52px] text-center text-[11px] text-white/35"
           >
-            Vul uren in bij de stappen om te zien waar de inzet zit
+            {emptyHint}
           </motion.p>
         ) : null}
       </AnimatePresence>
@@ -600,7 +629,7 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
                   fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
                   fontWeight="600"
                 >
-                  {formatHoursCompact(p.hours)}
+                  {formatDurationCompact(p.hours, durationUnit)}
                 </text>
               </g>
             );
@@ -638,16 +667,18 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
     patchMilestone,
     deleteMilestone,
     canDeleteMilestone,
+    durationUnit,
+    hidePainPoints,
   } = useEditor();
   const boxRef = useReportHeight(id);
   const hours = hoursByMilestone[data.id] ?? 0;
-  const painCount = painCountByMilestone[data.id] ?? 0;
+  const painCount = hidePainPoints ? 0 : painCountByMilestone[data.id] ?? 0;
   const n = data.index + 1;
 
   return (
     <div
       ref={boxRef}
-      className={`prep-pop-in w-[280px] rounded-xl bg-[#151f28] px-3.5 py-3 text-white shadow-sm transition-shadow duration-200 ${
+      className={`prep-pop-in w-[280px] rounded-xl bg-[#151f28] px-3.5 py-3.5 text-white shadow-sm transition-shadow duration-200 ${
         selected ? "ring-2 ring-[#ceff00]/70" : ""
       }`}
     >
@@ -675,7 +706,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
             </p>
           )}
           <p className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-[11px] text-white/75">
-            {formatHours(hours)}
+            {formatDuration(hours, durationUnit)}
           </p>
           {canDeleteMilestone ? (
             <button
@@ -895,15 +926,15 @@ function handleClass(kind: "source" | "target") {
 }
 
 function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
-  const { patchStep, deleteStep } = useEditor();
+  const { patchStep, deleteStep, durationUnit, hidePainPoints } = useEditor();
   const boxRef = useReportHeight(id);
-  const isPain = data.painPoint === true;
+  const isPain = !hidePainPoints && data.painPoint === true;
   const { leaving, exit } = useExitThen(() => deleteStep(id));
 
   return (
     <div ref={boxRef} className="prep-pop-in w-[272px]">
     <div
-      className={`prep-card rounded-xl border px-3 py-2.5 shadow-sm ${
+      className={`prep-card rounded-xl border px-3.5 py-3 shadow-sm ${
         leaving ? "is-leaving" : ""
       } ${isPain ? "border-rose-200 bg-[#fff8f6]" : "border-black/8 bg-white"} ${
         selected ? "ring-2 ring-[#151f28]/15" : ""
@@ -914,7 +945,7 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
       <Handle type="source" position={Position.Right} id="r" className={handleClass("source")} />
       <Handle type="source" position={Position.Bottom} id="b" className={handleClass("source")} />
 
-      <div className="flex items-start gap-1">
+      <div className="flex items-start gap-1.5">
         <button
           type="button"
           className="step-drag mt-0.5 cursor-grab rounded p-0.5 text-[#151f28]/30 hover:text-[#151f28]/70"
@@ -929,23 +960,25 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
           rows={2}
           className="nodrag min-w-0 flex-1 resize-none bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
         />
-        <button
-          type="button"
-          aria-pressed={isPain}
-          aria-label={isPain ? "Pijnpunt verwijderen" : "Markeer als pijnpunt"}
-          title={isPain ? "Pijnpunt — klik om te verwijderen" : "Markeer als pijnpunt"}
-          onClick={(e) => {
-            e.stopPropagation();
-            patchStep(id, { painPoint: !isPain });
-          }}
-          className={`step-pain nodrag rounded p-0.5 ${
-            isPain
-              ? "is-pain text-rose-600 hover:text-rose-700"
-              : "text-[#151f28]/25 hover:text-[#151f28]/70"
-          }`}
-        >
-          <FaceExpressionless className="h-3.5 w-3.5" />
-        </button>
+        {!hidePainPoints ? (
+          <button
+            type="button"
+            aria-pressed={isPain}
+            aria-label={isPain ? "Pijnpunt verwijderen" : "Markeer als pijnpunt"}
+            title={isPain ? "Pijnpunt — klik om te verwijderen" : "Markeer als pijnpunt (frictie / dubbel werk)"}
+            onClick={(e) => {
+              e.stopPropagation();
+              patchStep(id, { painPoint: !isPain });
+            }}
+            className={`step-pain nodrag rounded p-0.5 ${
+              isPain
+                ? "is-pain text-rose-600 hover:text-rose-700"
+                : "text-[#151f28]/25 hover:text-[#151f28]/70"
+            }`}
+          >
+            <FaceExpressionless className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={exit}
@@ -961,18 +994,20 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         onChange={(e) => patchStep(id, { description: e.target.value })}
         placeholder="Beschrijving — wat gebeurt hier?"
         rows={3}
-        className="nodrag mt-1.5 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
+        className="nodrag mt-2 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
       />
 
-      <div className="mt-2 space-y-1.5 border-t border-black/6 pt-2">
+      <div className="mt-2.5 space-y-2 border-t border-black/6 pt-2.5">
         <label className="flex min-w-0 items-center gap-1.5">
           <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
-          <span className="sr-only">Duur in uren</span>
+          <span className="sr-only">
+            Duur in {durationUnit === "minutes" ? "minuten" : "uren"}
+          </span>
           <span className="flex items-baseline gap-1">
             <input
               type="number"
               min={0}
-              step={0.5}
+              step={durationUnit === "minutes" ? 1 : 0.5}
               inputMode="decimal"
               value={data.duration}
               onChange={(e) => patchStep(id, { duration: e.target.value })}
@@ -980,7 +1015,9 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
               className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
             />
-            <span className="text-[13px] text-[#151f28]/45">uur</span>
+            <span className="text-[13px] text-[#151f28]/45">
+              {durationUnit === "minutes" ? "min" : "uur"}
+            </span>
           </span>
         </label>
         <ChipInput
@@ -1463,6 +1500,7 @@ type Props = {
     expect?: string[];
   };
   hideAiToggle?: boolean;
+  hidePainPoints?: boolean;
 };
 
 function minimapNodeColor(n: Node) {
@@ -1544,6 +1582,7 @@ function FlowCanvas({
   sketchLabel = "Processen",
   sketchHelp,
   hideAiToggle = false,
+  hidePainPoints = false,
 }: Props) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const fitToScreen = useCallback(() => {
@@ -1558,6 +1597,9 @@ function FlowCanvas({
   const [showAiKansen, setShowAiKansen] = useState(() => initial.showAiKansen === true);
   const [revealedAiIds, setRevealedAiIds] = useState<string[]>(
     () => initial.revealedAiMilestoneIds ?? []
+  );
+  const [durationUnit, setDurationUnitState] = useState<DurationUnit>(
+    () => (initial.durationUnit === "minutes" ? "minutes" : "hours")
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState(toRfEdges(initial.connections, initial.steps));
   const [nodes, setNodes, onNodesChange] = useNodesState(
@@ -1586,6 +1628,7 @@ function FlowCanvas({
   const stickiesRef = useRef(stickyList);
   const showAiRef = useRef(showAiKansen);
   const revealedAiRef = useRef(revealedAiIds);
+  const durationUnitRef = useRef(durationUnit);
   const edgesRef = useRef(edges);
   const heightsRef = useRef<Record<string, number>>({});
   const pendingStickyFocus = useRef<string | null>(null);
@@ -1607,6 +1650,7 @@ function FlowCanvas({
   stickiesRef.current = stickyList;
   showAiRef.current = showAiKansen;
   revealedAiRef.current = revealedAiIds;
+  durationUnitRef.current = durationUnit;
   edgesRef.current = edges;
 
   const reportHeight = useCallback((id: string, height: number) => {
@@ -1657,6 +1701,7 @@ function FlowCanvas({
       stickies: stickiesRef.current,
       showAiKansen: showAiRef.current,
       revealedAiMilestoneIds: revealedAiRef.current,
+      durationUnit: durationUnitRef.current,
     };
   }, []);
 
@@ -1748,6 +1793,11 @@ function FlowCanvas({
       const revealed = skip.has("revealedAiMilestoneIds")
         ? revealedAiRef.current
         : (doc.revealedAiMilestoneIds ?? []);
+      const unit = skip.has("durationUnit")
+        ? durationUnitRef.current
+        : doc.durationUnit === "minutes"
+          ? "minutes"
+          : "hours";
       const connections = skip.has("connections") ? fromRfEdges(edgesRef.current) : doc.connections;
 
       stepsRef.current = steps;
@@ -1756,6 +1806,7 @@ function FlowCanvas({
       stickiesRef.current = stickies;
       showAiRef.current = showAi;
       revealedAiRef.current = revealed;
+      durationUnitRef.current = unit;
 
       setStepList(steps);
       setAiList(ai);
@@ -1763,6 +1814,7 @@ function FlowCanvas({
       setStickyList(stickies);
       setShowAiKansen(showAi);
       setRevealedAiIds(revealed);
+      setDurationUnitState(unit);
 
       const styled = toRfEdges(connections, steps, edgesRef.current);
       edgesRef.current = styled;
@@ -1854,6 +1906,7 @@ function FlowCanvas({
       stickies: stickiesRef.current,
       showAiKansen: showAiRef.current,
       revealedAiMilestoneIds: revealedAiRef.current,
+      durationUnit: durationUnitRef.current,
     };
     if (sketchFingerprint(remote) === sketchFingerprint(local)) return;
     if (dirtyKeys.current.size > 0) return;
@@ -2200,7 +2253,7 @@ function FlowCanvas({
     const totals = {} as Record<PrepMilestoneId, number>;
     for (const m of milestones) totals[m.id] = 0;
     for (const step of stepList) {
-      totals[step.milestoneId] = (totals[step.milestoneId] ?? 0) + parseHours(step.duration);
+      totals[step.milestoneId] = (totals[step.milestoneId] ?? 0) + parseDuration(step.duration);
     }
     return totals;
   }, [milestones, stepList]);
@@ -2280,6 +2333,26 @@ function FlowCanvas({
     [persist, pushHistory]
   );
 
+  const setDurationUnit = useCallback(
+    (next: DurationUnit) => {
+      const prev = durationUnitRef.current;
+      if (prev === next) return;
+      pushHistory("duration-unit");
+      setStepList((list) => {
+        const converted = list.map((step) => ({
+          ...step,
+          duration: convertDurationValue(step.duration, prev, next),
+        }));
+        stepsRef.current = converted;
+        return converted;
+      });
+      durationUnitRef.current = next;
+      setDurationUnitState(next);
+      persist("durationUnit", "steps");
+    },
+    [persist, pushHistory]
+  );
+
   const ctx = useMemo<EditorCtx>(
     () => ({
       patchStep,
@@ -2307,6 +2380,8 @@ function FlowCanvas({
       deleteSticky,
       deleteConnection,
       chipSuggestions,
+      durationUnit,
+      hidePainPoints,
     }),
     [
       addAi,
@@ -2319,7 +2394,9 @@ function FlowCanvas({
       deleteConnection,
       deleteStep,
       deleteSticky,
+      durationUnit,
       formatsByMilestone,
+      hidePainPoints,
       hoursByMilestone,
       milestones.length,
       painCountByMilestone,
@@ -2590,6 +2667,30 @@ function FlowCanvas({
             >
               <StickyNote className="h-3.5 w-3.5" /> Sticky
             </button>
+            <div className="pointer-events-auto inline-flex items-center rounded-full bg-white p-0.5 text-[11px] font-semibold shadow-lg ring-1 ring-black/10">
+              <button
+                type="button"
+                onClick={() => setDurationUnit("minutes")}
+                className={`rounded-full px-2.5 py-1 transition ${
+                  durationUnit === "minutes"
+                    ? "bg-[#151f28] text-white"
+                    : "text-[#151f28]/55 hover:text-[#151f28]"
+                }`}
+              >
+                Min
+              </button>
+              <button
+                type="button"
+                onClick={() => setDurationUnit("hours")}
+                className={`rounded-full px-2.5 py-1 transition ${
+                  durationUnit === "hours"
+                    ? "bg-[#151f28] text-white"
+                    : "text-[#151f28]/55 hover:text-[#151f28]"
+                }`}
+              >
+                Uur
+              </button>
+            </div>
             {!hideAiToggle ? (
               <button
                 type="button"

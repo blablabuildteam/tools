@@ -153,6 +153,8 @@ export type WorkshopMeta = {
   sketchLabel?: string;
   /** Left infobox on Schets */
   sketchHelp?: WorkshopSketchHelp;
+  /** Hide friction/pain toggle on steps (process-capture sessions) */
+  hidePainPoints?: boolean;
   createdAt: string;
   updatedAt: string;
   passwordProtected: boolean;
@@ -239,6 +241,7 @@ export function createEmptyMeta(partial?: Partial<WorkshopMeta>): WorkshopMeta {
     tabs: partial?.tabs,
     sketchLabel: partial?.sketchLabel,
     sketchHelp: partial?.sketchHelp,
+    hidePainPoints: partial?.hidePainPoints,
     createdAt: partial?.createdAt ?? now,
     updatedAt: partial?.updatedAt ?? now,
     passwordProtected: Boolean(partial?.passwordProtected),
@@ -458,6 +461,8 @@ export type PrepAiIdea = {
   order: number;
 };
 
+export type DurationUnit = "hours" | "minutes";
+
 export type PrepPhaseSketch = {
   type: "prep-phase-v1";
   steps: PrepStep[];
@@ -467,6 +472,8 @@ export type PrepPhaseSketch = {
   stickies: PrepSticky[];
   showAiKansen?: boolean;
   revealedAiMilestoneIds?: string[];
+  /** How `PrepStep.duration` is interpreted. Default hours. */
+  durationUnit?: DurationUnit;
 };
 
 export const SKETCH_PATCH_KEYS = [
@@ -477,6 +484,7 @@ export const SKETCH_PATCH_KEYS = [
   "stickies",
   "showAiKansen",
   "revealedAiMilestoneIds",
+  "durationUnit",
 ] as const;
 
 export type SketchPatchKey = (typeof SKETCH_PATCH_KEYS)[number];
@@ -500,6 +508,7 @@ export function sketchFingerprint(doc: PrepPhaseSketch): string {
     stickies: doc.stickies,
     showAiKansen: doc.showAiKansen === true,
     revealedAiMilestoneIds: doc.revealedAiMilestoneIds ?? [],
+    durationUnit: doc.durationUnit === "minutes" ? "minutes" : "hours",
   });
 }
 
@@ -519,6 +528,8 @@ export function applySketchPatch(
       next.revealedAiMilestoneIds = Array.isArray(patch.revealedAiMilestoneIds)
         ? patch.revealedAiMilestoneIds.map(String).filter(Boolean)
         : [];
+    } else if (key === "durationUnit") {
+      next.durationUnit = patch.durationUnit === "minutes" ? "minutes" : "hours";
     } else if (key === "steps" && Array.isArray(patch.steps)) {
       next.steps = patch.steps.map(normalizePrepStep);
     } else if (key === "connections" && Array.isArray(patch.connections)) {
@@ -608,6 +619,7 @@ export function createEmptyPrepPhase(): PrepPhaseSketch {
     stickies: [],
     showAiKansen: false,
     revealedAiMilestoneIds: [],
+    durationUnit: "hours",
   };
 }
 
@@ -626,6 +638,7 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
     stickies?: unknown;
     showAiKansen?: unknown;
     revealedAiMilestoneIds?: unknown;
+    durationUnit?: unknown;
   };
   const milestones =
     Array.isArray(doc.milestones) && doc.milestones.length > 0
@@ -649,5 +662,6 @@ export function normalizePrepPhase(raw: unknown): PrepPhaseSketch | null {
     revealedAiMilestoneIds: Array.isArray(doc.revealedAiMilestoneIds)
       ? doc.revealedAiMilestoneIds.map(String).filter(Boolean)
       : [],
+    durationUnit: doc.durationUnit === "minutes" ? "minutes" : "hours",
   };
 }

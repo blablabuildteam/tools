@@ -29,6 +29,7 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
   const [sketchLabel, setSketchLabel] = useState("Processen");
   const [sketchHelp, setSketchHelp] = useState<WorkshopSketchHelp | undefined>();
   const [hideAiToggle, setHideAiToggle] = useState(false);
+  const [hidePainPoints, setHidePainPoints] = useState(false);
   const revRef = useRef<number | undefined>(undefined);
   const dirtyRef = useRef(false);
   const fingerprintRef = useRef("");
@@ -80,6 +81,7 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
         setSketchHelp(data.meta?.sketchHelp);
         const tabs = Array.isArray(data.meta?.tabs) ? data.meta.tabs.map(String) : null;
         setHideAiToggle(Boolean(tabs && !tabs.includes("reference")));
+        setHidePainPoints(data.meta?.hidePainPoints === true);
         const sketch = data.sketch as { aiIdeas?: unknown; milestones?: unknown; stickies?: unknown } | null;
         const hadAiField = isPrepPhaseSketch(data.sketch) && Array.isArray(sketch?.aiIdeas);
         const hadMilestones =
@@ -190,6 +192,7 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
         sketchLabel={sketchLabel}
         sketchHelp={sketchHelp}
         hideAiToggle={hideAiToggle}
+        hidePainPoints={hidePainPoints}
       />
       <WorkshopSyncNotice variant="light" corner="top-right" />
     </div>
