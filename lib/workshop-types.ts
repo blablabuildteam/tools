@@ -439,6 +439,8 @@ export type PrepStep = {
   formats: string[];
   /** Marked as a friction / pain point in the process. */
   painPoint: boolean;
+  /** Compact card — title row only. */
+  collapsed?: boolean;
   order: number;
 };
 
@@ -587,6 +589,7 @@ export function normalizePrepStep(step: PrepStep & {
     tools: asChipList(step.tools),
     formats: asChipList((step as PrepStep & { formats?: unknown }).formats),
     painPoint: step.painPoint === true,
+    collapsed: step.collapsed === true,
     order: typeof step.order === "number" ? step.order : 0,
   };
 }

@@ -24,7 +24,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { animate, AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Building2, Clock, FaceExpressionless, FileType, GripVertical, Info, Minus, Plus, Redo2, Scan, Sparkles, StickyNote, Trash2, Undo2, Users, Wrench } from "lucide-react";
+import { Building2, ChevronDown, ChevronRight, Clock, FaceExpressionless, FileType, GripVertical, Info, Minus, Plus, Redo2, Scan, Sparkles, StickyNote, Trash2, Undo2, Users, Wrench } from "lucide-react";
 import { nanoid } from "nanoid";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -54,6 +54,7 @@ const ORIGIN_Y = HOURS_BAND_Y + HOURS_BAND_H + 16;
 const HEADER_H = 148;
 const STEP_W = 272;
 const STEP_H = 248;
+const STEP_COLLAPSED_H = 56;
 const STEP_GAP = 8;
 const ADD_H = 44;
 const LANE_PAD = 14;
@@ -127,8 +128,9 @@ type EditorCtx = {
   reportHeight: (id: string, height: number) => void;
   patchMilestone: (id: string, partial: Partial<PrepMilestone>) => void;
   addMilestone: () => void;
-  deleteMilestone: (id: string) => void;
+  requestDeleteMilestone: (id: string) => void;
   canDeleteMilestone: boolean;
+  setStepsCollapsed: (collapsed: boolean) => void;
   patchSticky: (id: string, partial: Partial<PrepSticky>) => void;
   deleteSticky: (id: string) => void;
   deleteConnection: (id: string) => void;
@@ -364,7 +366,11 @@ function layoutNodes(
     let y = columnContentY(heights, m.id);
 
     col.forEach((step) => {
-      const stepH = measured(heights, step.id, STEP_H);
+      const stepH = measured(
+        heights,
+        step.id,
+        step.collapsed ? STEP_COLLAPSED_H : STEP_H
+      );
       columnNodes.push({
         id: step.id,
         type: "prep-step",
@@ -665,7 +671,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
     hoursByMilestone,
     painCountByMilestone,
     patchMilestone,
-    deleteMilestone,
+    requestDeleteMilestone,
     canDeleteMilestone,
     durationUnit,
     hidePainPoints,
@@ -713,7 +719,7 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                deleteMilestone(data.id);
+                requestDeleteMilestone(data.id);
               }}
               className="nodrag rounded p-0.5 text-white/30 hover:text-red-300"
               aria-label="Milestone verwijderen"
@@ -929,16 +935,23 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
   const { patchStep, deleteStep, durationUnit, hidePainPoints } = useEditor();
   const boxRef = useReportHeight(id);
   const isPain = !hidePainPoints && data.painPoint === true;
+  const collapsed = data.collapsed === true;
   const { leaving, exit } = useExitThen(() => deleteStep(id));
+  const metaBits = [
+    data.duration
+      ? `${data.duration}${durationUnit === "minutes" ? " min" : " u"}`
+      : null,
+    ...asChipList(data.tools).slice(0, 2),
+  ].filter(Boolean);
 
   return (
     <div ref={boxRef} className="prep-pop-in w-[272px]">
     <div
-      className={`prep-card rounded-xl border px-3.5 py-3 shadow-sm ${
-        leaving ? "is-leaving" : ""
-      } ${isPain ? "border-rose-200 bg-[#fff8f6]" : "border-black/8 bg-white"} ${
-        selected ? "ring-2 ring-[#151f28]/15" : ""
-      }`}
+      className={`prep-card rounded-xl border px-3.5 shadow-sm ${
+        collapsed ? "py-2.5" : "py-3"
+      } ${leaving ? "is-leaving" : ""} ${
+        isPain ? "border-rose-200 bg-[#fff8f6]" : "border-black/8 bg-white"
+      } ${selected ? "ring-2 ring-[#151f28]/15" : ""}`}
     >
       <Handle type="target" position={Position.Left} id="l" className={handleClass("target")} />
       <Handle type="target" position={Position.Top} id="t" className={handleClass("target")} />
@@ -953,14 +966,44 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <textarea
-          value={data.title}
-          onChange={(e) => patchStep(id, { title: e.target.value })}
-          placeholder="Titel van de stap"
-          rows={2}
-          className="nodrag min-w-0 flex-1 resize-none bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
-        />
-        {!hidePainPoints ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            patchStep(id, { collapsed: !collapsed });
+          }}
+          className="nodrag mt-0.5 rounded p-0.5 text-[#151f28]/35 hover:text-[#151f28]/75"
+          aria-label={collapsed ? "Uitklappen" : "Inklappen"}
+          title={collapsed ? "Uitklappen" : "Inklappen"}
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+        {collapsed ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              patchStep(id, { collapsed: false });
+            }}
+            className="nodrag min-w-0 flex-1 text-left"
+          >
+            <p className="truncate text-[14px] font-semibold leading-snug text-[#151f28]">
+              {data.title.trim() || "Naamloze stap"}
+            </p>
+            {metaBits.length ? (
+              <p className="mt-0.5 truncate text-[11px] text-[#151f28]/45">{metaBits.join(" · ")}</p>
+            ) : null}
+          </button>
+        ) : (
+          <textarea
+            value={data.title}
+            onChange={(e) => patchStep(id, { title: e.target.value })}
+            placeholder="Titel van de stap"
+            rows={2}
+            className="nodrag min-w-0 flex-1 resize-none bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
+          />
+        )}
+        {!hidePainPoints && !collapsed ? (
           <button
             type="button"
             aria-pressed={isPain}
@@ -989,70 +1032,82 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         </button>
       </div>
 
-      <textarea
-        value={data.description}
-        onChange={(e) => patchStep(id, { description: e.target.value })}
-        placeholder="Beschrijving — wat gebeurt hier?"
-        rows={3}
-        className="nodrag mt-2 w-full resize-none bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
-      />
-
-      <div className="mt-2.5 space-y-2 border-t border-black/6 pt-2.5">
-        <label className="flex min-w-0 items-center gap-1.5">
-          <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
-          <span className="sr-only">
-            Duur in {durationUnit === "minutes" ? "minuten" : "uren"}
-          </span>
-          <span className="flex items-baseline gap-1">
-            <input
-              type="number"
-              min={0}
-              step={durationUnit === "minutes" ? 1 : 0.5}
-              inputMode="decimal"
-              value={data.duration}
-              onChange={(e) => patchStep(id, { duration: e.target.value })}
-              placeholder="0"
-              className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
+      {!collapsed ? (
+        <>
+          <div className="mt-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/35">
+              Toelichting
+            </p>
+            <p className="mt-0.5 text-[11px] leading-snug text-[#151f28]/40">
+              Wat gebeurt er precies? Sleep de rechteronderhoek om groter te maken.
+            </p>
+            <textarea
+              value={data.description}
+              onChange={(e) => patchStep(id, { description: e.target.value })}
+              placeholder="Bijv. wie doet wat, in welk systeem, wat lever je op…"
+              rows={3}
+              className="nodrag nowheel mt-1.5 min-h-[4.5rem] w-full resize-y bg-transparent text-[13px] leading-snug text-[#151f28]/75 outline-none placeholder:text-[#151f28]/30"
             />
-            <span className="text-[13px] text-[#151f28]/45">
-              {durationUnit === "minutes" ? "min" : "uur"}
-            </span>
-          </span>
-        </label>
-        <ChipInput
-          icon={Users}
-          label="Persoon"
-          placeholder="Persoon · intern"
-          values={asChipList(data.people)}
-          kind="person"
-          onChange={(people) => patchStep(id, { people })}
-        />
-        <ChipInput
-          icon={Building2}
-          label="Partij"
-          placeholder="Partij · extern"
-          values={asChipList(data.parties)}
-          kind="party"
-          onChange={(parties) => patchStep(id, { parties })}
-        />
-        <ChipInput
-          icon={Wrench}
-          label="Tools"
-          placeholder="Tools"
-          values={asChipList(data.tools)}
-          kind="tool"
-          onChange={(tools) => patchStep(id, { tools })}
-        />
-        <ChipInput
-          icon={FileType}
-          label="Formaat"
-          placeholder="Formaat"
-          values={asChipList(data.formats)}
-          kind="format"
-          onChange={(formats) => patchStep(id, { formats })}
-        />
-      </div>
+          </div>
+
+          <div className="mt-2.5 space-y-2 border-t border-black/6 pt-2.5">
+            <label className="flex min-w-0 items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 shrink-0 text-[#151f28]/35" />
+              <span className="sr-only">
+                Duur in {durationUnit === "minutes" ? "minuten" : "uren"}
+              </span>
+              <span className="flex items-baseline gap-1">
+                <input
+                  type="number"
+                  min={0}
+                  step={durationUnit === "minutes" ? 1 : 0.5}
+                  inputMode="decimal"
+                  value={data.duration}
+                  onChange={(e) => patchStep(id, { duration: e.target.value })}
+                  placeholder="0"
+                  className="nodrag nowheel bg-transparent text-[13px] tabular-nums text-[#151f28]/85 outline-none placeholder:text-[#151f28]/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  style={{ width: `${Math.max(String(data.duration || "0").length, 1) + 0.4}ch` }}
+                />
+                <span className="text-[13px] text-[#151f28]/45">
+                  {durationUnit === "minutes" ? "min" : "uur"}
+                </span>
+              </span>
+            </label>
+            <ChipInput
+              icon={Users}
+              label="Persoon"
+              placeholder="Persoon · intern"
+              values={asChipList(data.people)}
+              kind="person"
+              onChange={(people) => patchStep(id, { people })}
+            />
+            <ChipInput
+              icon={Building2}
+              label="Partij"
+              placeholder="Partij · extern"
+              values={asChipList(data.parties)}
+              kind="party"
+              onChange={(parties) => patchStep(id, { parties })}
+            />
+            <ChipInput
+              icon={Wrench}
+              label="Tools"
+              placeholder="Tools"
+              values={asChipList(data.tools)}
+              kind="tool"
+              onChange={(tools) => patchStep(id, { tools })}
+            />
+            <ChipInput
+              icon={FileType}
+              label="Formaat"
+              placeholder="Formaat"
+              values={asChipList(data.formats)}
+              kind="format"
+              onChange={(formats) => patchStep(id, { formats })}
+            />
+          </div>
+        </>
+      ) : null}
     </div>
     </div>
   );
@@ -1419,12 +1474,16 @@ function reorderMilestones(list: PrepMilestone[], id: string, insertAt: number):
   return rest.map((m, i) => ({ ...m, order: i }));
 }
 
+function stepFallbackH(step: { collapsed?: boolean }) {
+  return step.collapsed ? STEP_COLLAPSED_H : STEP_H;
+}
+
 function stepsBlockHeight(
   heights: Record<string, number>,
-  steps: { id: string }[]
+  steps: PrepStep[]
 ) {
   let h = 0;
-  for (const step of steps) h += measured(heights, step.id, STEP_H) + STEP_GAP;
+  for (const step of steps) h += measured(heights, step.id, stepFallbackH(step)) + STEP_GAP;
   return h + ADD_H + 8 + REVEAL_H + 8;
 }
 
@@ -1443,11 +1502,23 @@ function dropSlot(
       .filter((s) => s.milestoneId === milestoneId && s.id !== node.id)
       .sort((a, b) => a.order - b.order);
     const startY = columnContentY(heights, milestoneId);
-    const centerY = node.position.y + measured(heights, node.id, STEP_H) / 2;
+    const moving = steps.find((s) => s.id === node.id);
+    const ownH = measured(heights, node.id, stepFallbackH(moving ?? {}));
+    const centerY = node.position.y + ownH / 2;
+    let cursor = startY;
+    let insertAt = siblings.length;
+    for (let i = 0; i < siblings.length; i += 1) {
+      const h = measured(heights, siblings[i].id, stepFallbackH(siblings[i]));
+      if (centerY < cursor + h / 2) {
+        insertAt = i;
+        break;
+      }
+      cursor += h + STEP_GAP;
+    }
     return {
       kind: "prep-step",
       milestoneId,
-      insertAt: insertIndexFromY(siblings, centerY, startY, heights, STEP_H, STEP_GAP),
+      insertAt,
     };
   }
   if (node.type === "ai-idea") {
@@ -2048,6 +2119,7 @@ function FlowCanvas({
             tools: [],
             formats: [],
             painPoint: false,
+            collapsed: false,
             order,
           },
         ];
@@ -2125,13 +2197,6 @@ function FlowCanvas({
   const deleteMilestone = useCallback(
     (id: string) => {
       if (milestonesRef.current.length <= 1) return;
-      const stepCount = stepsRef.current.filter((s) => s.milestoneId === id).length;
-      const ok = window.confirm(
-        stepCount > 0
-          ? `Dit proces verwijderen? ${stepCount} stap${stepCount === 1 ? "" : "pen"} gaan mee weg.`
-          : "Dit proces / milestone verwijderen?"
-      );
-      if (!ok) return;
       pushHistory();
       const removedStepIds = new Set(
         stepsRef.current.filter((s) => s.milestoneId === id).map((s) => s.id)
@@ -2169,6 +2234,37 @@ function FlowCanvas({
       persist("milestones", "steps", "aiIdeas", "connections", "revealedAiMilestoneIds");
     },
     [persist, pushHistory, setEdges]
+  );
+
+  const [deletePrompt, setDeletePrompt] = useState<{
+    id: string;
+    title: string;
+    stepCount: number;
+  } | null>(null);
+
+  const requestDeleteMilestone = useCallback((id: string) => {
+    if (milestonesRef.current.length <= 1) return;
+    const mile = milestonesRef.current.find((m) => m.id === id);
+    if (!mile) return;
+    const stepCount = stepsRef.current.filter((s) => s.milestoneId === id).length;
+    setDeletePrompt({
+      id,
+      title: mile.short.trim() || mile.title.trim() || "Dit proces",
+      stepCount,
+    });
+  }, []);
+
+  const setStepsCollapsed = useCallback(
+    (collapsed: boolean) => {
+      pushHistory("collapse-all");
+      setStepList((prev) => {
+        const next = prev.map((s) => ({ ...s, collapsed }));
+        stepsRef.current = next;
+        return next;
+      });
+      persist("steps");
+    },
+    [persist, pushHistory]
   );
 
   const patchSticky = useCallback(
@@ -2374,8 +2470,9 @@ function FlowCanvas({
       reportHeight,
       patchMilestone,
       addMilestone,
-      deleteMilestone,
+      requestDeleteMilestone,
       canDeleteMilestone: milestones.length > 1,
+      setStepsCollapsed,
       patchSticky,
       deleteSticky,
       deleteConnection,
@@ -2386,7 +2483,8 @@ function FlowCanvas({
     [
       addAi,
       addMilestone,
-      deleteMilestone,
+      requestDeleteMilestone,
+      setStepsCollapsed,
       addStep,
       aiCountByMilestone,
       chipSuggestions,
@@ -2667,6 +2765,20 @@ function FlowCanvas({
             >
               <StickyNote className="h-3.5 w-3.5" /> Sticky
             </button>
+            <button
+              type="button"
+              onClick={() => setStepsCollapsed(true)}
+              className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
+            >
+              Inklappen
+            </button>
+            <button
+              type="button"
+              onClick={() => setStepsCollapsed(false)}
+              className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
+            >
+              Uitklappen
+            </button>
             <div className="pointer-events-auto inline-flex items-center rounded-full bg-white p-0.5 text-[11px] font-semibold shadow-lg ring-1 ring-black/10">
               <button
                 type="button"
@@ -2794,6 +2906,55 @@ function FlowCanvas({
             </div>
           ) : null}
         </div>
+
+        {deletePrompt ? (
+          <div
+            className="absolute inset-0 z-50 flex items-center justify-center bg-[#151f28]/45 px-4 backdrop-blur-[2px]"
+            role="presentation"
+            onClick={() => setDeletePrompt(null)}
+          >
+            <div
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-milestone-title"
+              aria-describedby="delete-milestone-desc"
+              className="w-full max-w-sm rounded-2xl bg-white p-5 text-[#151f28] shadow-2xl ring-1 ring-black/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#151f28]/40">
+                Verwijderen
+              </p>
+              <h2 id="delete-milestone-title" className="mt-2 text-lg font-semibold tracking-tight">
+                {deletePrompt.title} verwijderen?
+              </h2>
+              <p id="delete-milestone-desc" className="mt-2 text-[13px] leading-relaxed text-[#151f28]/65">
+                {deletePrompt.stepCount > 0
+                  ? `${deletePrompt.stepCount} stap${deletePrompt.stepCount === 1 ? "" : "pen"} in dit proces gaan mee weg. Dit kun je daarna nog ongedaan maken met ⌘Z.`
+                  : "Dit proces verdwijnt van het bord. Je kunt het daarna nog ongedaan maken met ⌘Z."}
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeletePrompt(null)}
+                  className="rounded-full bg-[#151f28]/6 px-4 py-2 text-[12px] font-semibold text-[#151f28] hover:bg-[#151f28]/10"
+                >
+                  Annuleren
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = deletePrompt.id;
+                    setDeletePrompt(null);
+                    deleteMilestone(id);
+                  }}
+                  className="rounded-full bg-[#151f28] px-4 py-2 text-[12px] font-semibold text-white hover:bg-[#151f28]/90"
+                >
+                  Verwijderen
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </EditorContext.Provider>
   );
