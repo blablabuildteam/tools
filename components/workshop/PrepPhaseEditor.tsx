@@ -1730,6 +1730,7 @@ function FlowCanvas({
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [showSketchTips, setShowSketchTips] = useState(false);
+  const [showSketchHelp, setShowSketchHelp] = useState(false);
   const tipsRef = useRef<HTMLDivElement>(null);
   const [heightRev, setHeightRev] = useState(0);
   stepsRef.current = stepList;
@@ -2736,27 +2737,43 @@ function FlowCanvas({
 
         <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[min(360px,calc(100%-1.5rem))] flex-col gap-2">
           {sketchHelp ? (
-            <div className="pointer-events-auto rounded-2xl bg-white px-4 py-3.5 text-[#151f28] shadow-lg ring-1 ring-black/8">
-              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#151f28]/40">
-                {sketchHelp.title}
-              </p>
-              <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-[#151f28]/75">
-                {sketchHelp.body.map((line) => (
-                  <li key={line} className="flex gap-2">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#151f28]/35" />
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-              {sketchHelp.expect?.length ? (
-                <>
-                  <p className="mt-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/40">
-                    Vul per stap in
-                  </p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-[#151f28]/65">
-                    {sketchHelp.expect.join(" · ")}
-                  </p>
-                </>
+            <div className="pointer-events-auto w-[min(300px,calc(100vw-1.5rem))] overflow-hidden rounded-2xl bg-white text-[#151f28] shadow-lg ring-1 ring-black/8">
+              <button
+                type="button"
+                onClick={() => setShowSketchHelp((open) => !open)}
+                aria-expanded={showSketchHelp}
+                className="flex w-full items-center justify-between gap-2 px-3.5 py-2.5 text-left hover:bg-black/[0.03]"
+              >
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#151f28]/45">
+                  {sketchHelp.title}
+                </span>
+                {showSketchHelp ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#151f28]/40" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#151f28]/40" />
+                )}
+              </button>
+              {showSketchHelp ? (
+                <div className="border-t border-black/6 px-3.5 pb-3.5 pt-2.5">
+                  <ul className="space-y-1.5 text-[12px] leading-relaxed text-[#151f28]/75">
+                    {sketchHelp.body.map((line) => (
+                      <li key={line} className="flex gap-2">
+                        <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#151f28]/35" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {sketchHelp.expect?.length ? (
+                    <>
+                      <p className="mt-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/40">
+                        Vul per stap in
+                      </p>
+                      <p className="mt-1 text-[12px] leading-relaxed text-[#151f28]/65">
+                        {sketchHelp.expect.join(" · ")}
+                      </p>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
             </div>
           ) : null}
