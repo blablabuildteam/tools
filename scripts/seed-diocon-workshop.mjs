@@ -494,6 +494,17 @@ async function seedOne(sessionId) {
       logo: "/workshop/diocon/logo.png",
       schedule: "Process workshop · project setup · uren · berekeningen · modelleren",
       goal: "Kerprocessen in kaart → frictie & tijd → prioriteit #1 automatisering",
+      tabs: ["sketch"],
+      sketchLabel: "dioCON processen",
+      sketchHelp: {
+        title: "Wat gebeurt hier?",
+        body: [
+          "Dit bord is jullie procesplaat. De kolommen bovenaan zijn de kerprocessen (Project setup, Uren, Berekeningen, Modeleren).",
+          "Per kolom staan de stappen zoals we die nu kennen uit jullie prep — corrigeer, schrap of voeg toe wat klopt.",
+          "Markeer pijnpunten met het gezichtje. Vul tijd, wie en tools in waar je het weet.",
+        ],
+        expect: ["Titel", "Wat gebeurt er", "Tijd (uur)", "Wie", "Tools / systeem"],
+      },
       createdAt: existing?.meta?.createdAt || now,
       updatedAt: now,
       passwordProtected: false,

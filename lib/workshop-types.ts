@@ -123,6 +123,22 @@ export type WorkshopSummary = {
   nextStepsOut: string;
 };
 
+export type WorkshopTab = "intro" | "sketch" | "board" | "reference" | "wrap";
+
+export const ALL_WORKSHOP_TABS: WorkshopTab[] = [
+  "intro",
+  "sketch",
+  "board",
+  "reference",
+  "wrap",
+];
+
+export type WorkshopSketchHelp = {
+  title: string;
+  body: string[];
+  expect?: string[];
+};
+
 export type WorkshopMeta = {
   title: string;
   company: string;
@@ -131,6 +147,12 @@ export type WorkshopMeta = {
   logo?: string;
   /** Optional schedule line on intro, e.g. `Workshop · processen in kaart` */
   schedule?: string;
+  /** Visible tabs; omit for full workshop. e.g. `["sketch"]` for process-fill sessions */
+  tabs?: WorkshopTab[];
+  /** Chrome label on Schets, default “Voorbereidingsfase” */
+  sketchLabel?: string;
+  /** Left infobox on Schets */
+  sketchHelp?: WorkshopSketchHelp;
   createdAt: string;
   updatedAt: string;
   passwordProtected: boolean;
@@ -214,6 +236,9 @@ export function createEmptyMeta(partial?: Partial<WorkshopMeta>): WorkshopMeta {
       "Informatie-verzameling versnellen → gestandaardiseerd rapport",
     logo: partial?.logo,
     schedule: partial?.schedule,
+    tabs: partial?.tabs,
+    sketchLabel: partial?.sketchLabel,
+    sketchHelp: partial?.sketchHelp,
     createdAt: partial?.createdAt ?? now,
     updatedAt: partial?.updatedAt ?? now,
     passwordProtected: Boolean(partial?.passwordProtected),
@@ -221,6 +246,15 @@ export function createEmptyMeta(partial?: Partial<WorkshopMeta>): WorkshopMeta {
     intro: partial?.intro,
     summary: partial?.summary ?? createEmptySummary(),
   };
+}
+
+export function normalizeWorkshopTabs(raw: unknown): WorkshopTab[] {
+  const allowed = new Set<WorkshopTab>(ALL_WORKSHOP_TABS);
+  if (!Array.isArray(raw) || raw.length === 0) return [...ALL_WORKSHOP_TABS];
+  const next = raw
+    .map((t) => String(t) as WorkshopTab)
+    .filter((t) => allowed.has(t));
+  return next.length ? Array.from(new Set(next)) : [...ALL_WORKSHOP_TABS];
 }
 
 export function publicMeta(meta: WorkshopMeta): Omit<WorkshopMeta, "passwordHash"> {

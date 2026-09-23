@@ -44,15 +44,15 @@ import {
   type SketchPatchKey,
 } from "@/lib/workshop-types";
 
-const COL_W = 280;
-const COL_GAP = 40;
+const COL_W = 300;
+const COL_GAP = 36;
 const ORIGIN_X = 36;
 const HOURS_BAND_Y = 24;
 const HOURS_BAND_H = 116;
 const ORIGIN_Y = HOURS_BAND_Y + HOURS_BAND_H + 16;
-const HEADER_H = 168;
-const STEP_W = 252;
-const STEP_H = 236;
+const HEADER_H = 148;
+const STEP_W = 272;
+const STEP_H = 248;
 const STEP_GAP = 8;
 const ADD_H = 44;
 const LANE_PAD = 14;
@@ -62,28 +62,14 @@ const ADD_AI_H = 36;
 const REVEAL_H = 52;
 const STICKY_W = 176;
 const STICKY_H = 132;
-const ADD_MILESTONE_W = 260;
+const ADD_MILESTONE_W = 280;
 const ADD_MILESTONE_H = 118;
-const MILESTONE_W = 260;
+const MILESTONE_W = 280;
 const BOARD_BG = "#f3f1eb";
 
 const LANE_COLORS = [
-  "rgba(206, 255, 0, 0.09)",
-  "rgba(56, 189, 248, 0.09)",
-  "rgba(167, 139, 250, 0.09)",
-  "rgba(251, 191, 36, 0.09)",
-  "rgba(52, 211, 153, 0.09)",
-  "rgba(251, 146, 60, 0.09)",
-  "rgba(244, 114, 182, 0.09)",
-  "rgba(34, 211, 238, 0.09)",
-  "rgba(163, 230, 53, 0.09)",
-  "rgba(251, 113, 133, 0.1)",
-  "rgba(129, 140, 248, 0.1)",
-  "rgba(45, 212, 191, 0.1)",
-  "rgba(232, 121, 249, 0.1)",
-  "rgba(250, 204, 21, 0.1)",
-  "rgba(125, 211, 252, 0.1)",
-  "rgba(253, 186, 116, 0.1)",
+  "rgba(21, 31, 40, 0.035)",
+  "rgba(21, 31, 40, 0.045)",
 ];
 
 function laneBackground(index: number) {
@@ -140,6 +126,8 @@ type EditorCtx = {
   reportHeight: (id: string, height: number) => void;
   patchMilestone: (id: string, partial: Partial<PrepMilestone>) => void;
   addMilestone: () => void;
+  deleteMilestone: (id: string) => void;
+  canDeleteMilestone: boolean;
   patchSticky: (id: string, partial: Partial<PrepSticky>) => void;
   deleteSticky: (id: string) => void;
   deleteConnection: (id: string) => void;
@@ -623,65 +611,19 @@ function HoursBandNode({ data }: NodeProps<Node<HoursBandData>>) {
   );
 }
 
-const PERSON_PALETTE = [
-  { bg: "#CEFF00", text: "#151f28" },
-  { bg: "#7DD3FC", text: "#0c4a6e" },
-  { bg: "#F9A8D4", text: "#831843" },
-  { bg: "#FCD34D", text: "#78350f" },
-  { bg: "#C4B5FD", text: "#4c1d95" },
-  { bg: "#FDBA74", text: "#9a3412" },
-  { bg: "#86EFAC", text: "#14532d" },
-  { bg: "#FDA4AF", text: "#9f1239" },
-];
-
-const TOOL_PALETTE = [
-  { bg: "#1125ff", text: "#ffffff" },
-  { bg: "#151f28", text: "#ceff00" },
-  { bg: "#0ea5e9", text: "#ffffff" },
-  { bg: "#059669", text: "#ffffff" },
-  { bg: "#7c3aed", text: "#ffffff" },
-  { bg: "#db2777", text: "#ffffff" },
-  { bg: "#ea580c", text: "#ffffff" },
-  { bg: "#4338ca", text: "#ffffff" },
-];
-
-const PARTY_PALETTE = [
-  { bg: "#ea580c", text: "#ffffff" },
-  { bg: "#f97316", text: "#ffffff" },
-  { bg: "#c2410c", text: "#ffffff" },
-  { bg: "#fb923c", text: "#7c2d12" },
-  { bg: "#b45309", text: "#ffffff" },
-  { bg: "#fdba74", text: "#7c2d12" },
-  { bg: "#9a3412", text: "#fff7ed" },
-  { bg: "#d97706", text: "#ffffff" },
-];
-
-const FORMAT_PALETTE = [
-  { bg: "#334155", text: "#f8fafc" },
-  { bg: "#0f766e", text: "#ffffff" },
-  { bg: "#1d4ed8", text: "#ffffff" },
-  { bg: "#9f1239", text: "#fff1f2" },
-  { bg: "#365314", text: "#ecfccb" },
-  { bg: "#57534e", text: "#fafaf9" },
-  { bg: "#6d28d9", text: "#f5f3ff" },
-  { bg: "#0c4a6e", text: "#e0f2fe" },
-];
+const PERSON_PALETTE = [{ bg: "#ebe8e1", text: "#3d3a34" }];
+const TOOL_PALETTE = [{ bg: "#e4e9f0", text: "#2f3a48" }];
+const PARTY_PALETTE = [{ bg: "#efe6dc", text: "#4a3b2f" }];
+const FORMAT_PALETTE = [{ bg: "#e7ebe7", text: "#334038" }];
 
 const FORMAT_PRESETS = ["Excel", "PDF", "Word", "PowerPoint", "Email", "Dashboard"];
 
 function chipColor(label: string, kind: ChipKind) {
-  const palette =
-    kind === "person"
-      ? PERSON_PALETTE
-      : kind === "party"
-        ? PARTY_PALETTE
-        : kind === "format"
-          ? FORMAT_PALETTE
-          : TOOL_PALETTE;
-  const key = label.trim().toLowerCase();
-  let hash = 0;
-  for (let i = 0; i < key.length; i += 1) hash = (hash * 33 + key.charCodeAt(i)) >>> 0;
-  return palette[hash % palette.length];
+  void label;
+  if (kind === "person") return PERSON_PALETTE[0];
+  if (kind === "party") return PARTY_PALETTE[0];
+  if (kind === "format") return FORMAT_PALETTE[0];
+  return TOOL_PALETTE[0];
 }
 
 function columnContentY(heights: Record<string, number>, milestoneId: PrepMilestoneId) {
@@ -692,31 +634,20 @@ function columnContentY(heights: Record<string, number>, milestoneId: PrepMilest
 function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
   const {
     hoursByMilestone,
-    aiCountByMilestone,
     painCountByMilestone,
-    peopleByMilestone,
-    partiesByMilestone,
-    toolsByMilestone,
-    formatsByMilestone,
     patchMilestone,
-    showAiKansen,
-    revealedAiMilestoneIds,
+    deleteMilestone,
+    canDeleteMilestone,
   } = useEditor();
   const boxRef = useReportHeight(id);
   const hours = hoursByMilestone[data.id] ?? 0;
-  const aiCount = aiCountByMilestone[data.id] ?? 0;
   const painCount = painCountByMilestone[data.id] ?? 0;
-  const people = peopleByMilestone[data.id] ?? [];
-  const parties = partiesByMilestone[data.id] ?? [];
-  const tools = toolsByMilestone[data.id] ?? [];
-  const formats = formatsByMilestone[data.id] ?? [];
   const n = data.index + 1;
-  const aiOpen = isAiOpen(data.id, showAiKansen, revealedAiMilestoneIds);
 
   return (
     <div
       ref={boxRef}
-      className={`prep-pop-in w-[260px] rounded-xl bg-[#151f28] px-3 py-3 text-white shadow-sm transition-shadow duration-200 ${
+      className={`prep-pop-in w-[280px] rounded-xl bg-[#151f28] px-3.5 py-3 text-white shadow-sm transition-shadow duration-200 ${
         selected ? "ring-2 ring-[#ceff00]/70" : ""
       }`}
     >
@@ -729,98 +660,62 @@ function MilestoneNode({ id, data, selected }: NodeProps<Node<MilestoneData>>) {
           >
             <GripVertical className="h-4 w-4" />
           </button>
-          <p className="font-mono text-[12px] uppercase tracking-[0.18em] text-[#ceff00]">
-            {String(n).padStart(2, "0")} · voorbereiding
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-white/40">
+            {String(n).padStart(2, "0")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {aiOpen && aiCount > 0 && (
-            <p className="rounded-full bg-[#ceff00]/15 px-2 py-0.5 font-mono text-[12px] font-semibold text-[#ceff00]">
-              {aiCount} AI
-            </p>
-          )}
           {painCount > 0 && (
             <p
-              className="inline-flex items-center gap-0.5 rounded-full bg-rose-500/20 px-1.5 py-0.5 font-mono text-[12px] font-semibold text-rose-300"
+              className="inline-flex items-center gap-0.5 rounded-md bg-white/10 px-1.5 py-0.5 font-mono text-[11px] text-white/70"
               title={`${painCount} pijnpunt${painCount === 1 ? "" : "en"}`}
             >
               <FaceExpressionless className="h-3.5 w-3.5" />
               {painCount}
             </p>
           )}
-          <p className="rounded-full bg-[#ceff00] px-2 py-0.5 font-mono text-[12px] font-semibold text-[#151f28]">
+          <p className="rounded-md bg-white/10 px-2 py-0.5 font-mono text-[11px] text-white/75">
             {formatHours(hours)}
           </p>
+          {canDeleteMilestone ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteMilestone(data.id);
+              }}
+              className="nodrag rounded p-0.5 text-white/30 hover:text-red-300"
+              aria-label="Milestone verwijderen"
+              title="Milestone verwijderen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
         </div>
       </div>
-      <input
+      <textarea
         value={data.short}
         onChange={(e) => patchMilestone(data.id, { short: e.target.value })}
-        placeholder="Naam milestone"
-        className="nodrag mt-1.5 w-full bg-transparent text-[15px] font-semibold leading-tight tracking-tight text-white outline-none placeholder:text-white/30"
+        placeholder="Naam proces / milestone"
+        rows={2}
+        className="nodrag mt-2 w-full resize-none bg-transparent text-[16px] font-semibold leading-snug tracking-tight text-white outline-none placeholder:text-white/30"
       />
       <textarea
         value={data.title}
         onChange={(e) => patchMilestone(data.id, { title: e.target.value })}
-        placeholder="Beschrijving"
+        placeholder="Korte beschrijving (optioneel)"
         rows={2}
-        className="nodrag mt-1 w-full resize-none bg-transparent text-[13px] leading-snug text-white/55 outline-none placeholder:text-white/30"
+        className="nodrag mt-1.5 w-full resize-none bg-transparent text-[13px] leading-snug text-white/55 outline-none placeholder:text-white/30"
       />
-      {(people.length > 0 || parties.length > 0 || tools.length > 0 || formats.length > 0) && (
-        <div className="mt-2 space-y-1.5 border-t border-white/10 pt-2">
-          <RollupChips icon={Users} values={people} kind="person" />
-          <RollupChips icon={Building2} values={parties} kind="party" />
-          <RollupChips icon={Wrench} values={tools} kind="tool" />
-          <RollupChips icon={FileType} values={formats} kind="format" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function RollupChips({
-  icon: Icon,
-  values,
-  kind,
-}: {
-  icon: typeof Users;
-  values: string[];
-  kind: ChipKind;
-}) {
-  if (!values.length) return null;
-  return (
-    <div className="flex min-w-0 items-start gap-1.5">
-      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" />
-      <div className="flex min-w-0 flex-wrap gap-1">
-        <AnimatePresence initial={false} mode="popLayout">
-          {values.map((value) => {
-            const tone = chipColor(value, kind);
-            return (
-              <motion.span
-                key={`${kind}-${value.toLowerCase()}`}
-                layout="position"
-                initial={{ opacity: 0, scale: 0.82 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.82 }}
-                transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
-                className="inline-flex max-w-full truncate rounded-full px-1.5 py-0.5 text-[12px] font-semibold leading-tight"
-                style={{ backgroundColor: tone.bg, color: tone.text }}
-              >
-                {value}
-              </motion.span>
-            );
-          })}
-        </AnimatePresence>
-      </div>
     </div>
   );
 }
 
 function AddMilestoneNode() {
   return (
-    <div className="nodrag nopan flex h-[118px] w-[260px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#151f28]/25 bg-white/80 px-3 text-center text-[#151f28]/65 transition-colors duration-200 hover:border-[#151f28]/45 hover:bg-white">
+    <div className="nodrag nopan flex h-[118px] w-[280px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-[#151f28]/20 bg-white/70 px-3 text-center text-[#151f28]/55 transition-colors duration-200 hover:border-[#151f28]/40 hover:bg-white">
       <Plus className="h-5 w-5" />
-      <span className="text-[13px] font-semibold">Milestone toevoegen</span>
+      <span className="text-[13px] font-semibold">Proces toevoegen</span>
     </div>
   );
 }
@@ -1002,27 +897,16 @@ function handleClass(kind: "source" | "target") {
 function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
   const { patchStep, deleteStep } = useEditor();
   const boxRef = useReportHeight(id);
-  const hasParty = asChipList(data.parties).length > 0;
   const isPain = data.painPoint === true;
   const { leaving, exit } = useExitThen(() => deleteStep(id));
 
   return (
-    <div ref={boxRef} className="prep-pop-in w-[252px]">
+    <div ref={boxRef} className="prep-pop-in w-[272px]">
     <div
-      className={`prep-card rounded-xl border-2 px-3 py-2.5 shadow-sm ${
+      className={`prep-card rounded-xl border px-3 py-2.5 shadow-sm ${
         leaving ? "is-leaving" : ""
-      } ${isPain ? "bg-[#fff4f0]" : "bg-white"} ${
-        hasParty
-          ? selected
-            ? "border-orange-500 ring-2 ring-orange-400/40"
-            : "border-orange-400"
-          : isPain
-            ? selected
-              ? "border-rose-400 ring-2 ring-rose-300/40"
-              : "border-rose-300"
-            : selected
-              ? "border-[#1125ff]/50 ring-2 ring-[#1125ff]/20"
-              : "border-black/10"
+      } ${isPain ? "border-rose-200 bg-[#fff8f6]" : "border-black/8 bg-white"} ${
+        selected ? "ring-2 ring-[#151f28]/15" : ""
       }`}
     >
       <Handle type="target" position={Position.Left} id="l" className={handleClass("target")} />
@@ -1038,11 +922,12 @@ function StepNode({ id, data, selected }: NodeProps<Node<PrepStep>>) {
         >
           <GripVertical className="h-4 w-4" />
         </button>
-        <input
+        <textarea
           value={data.title}
           onChange={(e) => patchStep(id, { title: e.target.value })}
           placeholder="Titel van de stap"
-          className="nodrag min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-[#151f28] outline-none placeholder:text-[#151f28]/30"
+          rows={2}
+          className="nodrag min-w-0 flex-1 resize-none bg-transparent text-[15px] font-semibold leading-snug text-[#151f28] outline-none placeholder:text-[#151f28]/30"
         />
         <button
           type="button"
@@ -1571,6 +1456,13 @@ type Props = {
   initial: PrepPhaseSketch;
   remote?: PrepPhaseSketch | null;
   onSave: (doc: PrepPhaseSketch, touched: SketchPatchKey[]) => void;
+  sketchLabel?: string;
+  sketchHelp?: {
+    title: string;
+    body: string[];
+    expect?: string[];
+  };
+  hideAiToggle?: boolean;
 };
 
 function minimapNodeColor(n: Node) {
@@ -1578,7 +1470,6 @@ function minimapNodeColor(n: Node) {
   if (n.type === "hours-band" || n.type === "milestone") return "#151f28";
   if (n.type === "prep-step") {
     const step = n.data as PrepStep;
-    if (asChipList(step.parties).length) return "#fff7ed";
     if (step.painPoint) return "#fff4f0";
     return "#ffffff";
   }
@@ -1646,7 +1537,14 @@ function carryNodeState(next: Node[], prev: Node[], draggingId: string | null): 
   });
 }
 
-function FlowCanvas({ initial, remote, onSave }: Props) {
+function FlowCanvas({
+  initial,
+  remote,
+  onSave,
+  sketchLabel = "Processen",
+  sketchHelp,
+  hideAiToggle = false,
+}: Props) {
   const { fitView, screenToFlowPosition, zoomIn, zoomOut } = useReactFlow();
   const fitToScreen = useCallback(() => {
     fitView({ padding: 0.08, duration: 220 });
@@ -2160,7 +2058,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
         ...prev,
         {
           id: `ms-${nanoid(8)}`,
-          short: "Nieuw milestone",
+          short: "Nieuw proces",
           title: "",
           order: prev.length,
         },
@@ -2170,6 +2068,55 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     });
     persist("milestones");
   }, [persist, pushHistory]);
+
+  const deleteMilestone = useCallback(
+    (id: string) => {
+      if (milestonesRef.current.length <= 1) return;
+      const stepCount = stepsRef.current.filter((s) => s.milestoneId === id).length;
+      const ok = window.confirm(
+        stepCount > 0
+          ? `Dit proces verwijderen? ${stepCount} stap${stepCount === 1 ? "" : "pen"} gaan mee weg.`
+          : "Dit proces / milestone verwijderen?"
+      );
+      if (!ok) return;
+      pushHistory();
+      const removedStepIds = new Set(
+        stepsRef.current.filter((s) => s.milestoneId === id).map((s) => s.id)
+      );
+      setMilestones((prev) => {
+        const next = prev
+          .filter((m) => m.id !== id)
+          .sort((a, b) => a.order - b.order)
+          .map((m, i) => ({ ...m, order: i }));
+        milestonesRef.current = next;
+        return next;
+      });
+      setStepList((prev) => {
+        const next = prev.filter((s) => s.milestoneId !== id);
+        stepsRef.current = next;
+        return next;
+      });
+      setAiList((prev) => {
+        const next = prev.filter((s) => s.milestoneId !== id);
+        aiRef.current = next;
+        return next;
+      });
+      setEdges((prev) => {
+        const next = prev.filter(
+          (e) => !removedStepIds.has(e.source) && !removedStepIds.has(e.target)
+        );
+        edgesRef.current = next;
+        return next;
+      });
+      setRevealedAiIds((prev) => {
+        const next = prev.filter((mid) => mid !== id);
+        revealedAiRef.current = next;
+        return next;
+      });
+      persist("milestones", "steps", "aiIdeas", "connections", "revealedAiMilestoneIds");
+    },
+    [persist, pushHistory, setEdges]
+  );
 
   const patchSticky = useCallback(
     (id: string, partial: Partial<PrepSticky>) => {
@@ -2354,6 +2301,8 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       reportHeight,
       patchMilestone,
       addMilestone,
+      deleteMilestone,
+      canDeleteMilestone: milestones.length > 1,
       patchSticky,
       deleteSticky,
       deleteConnection,
@@ -2362,6 +2311,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
     [
       addAi,
       addMilestone,
+      deleteMilestone,
       addStep,
       aiCountByMilestone,
       chipSuggestions,
@@ -2371,6 +2321,7 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
       deleteSticky,
       formatsByMilestone,
       hoursByMilestone,
+      milestones.length,
       painCountByMilestone,
       patchAi,
       patchMilestone,
@@ -2591,46 +2542,75 @@ function FlowCanvas({ initial, remote, onSave }: Props) {
           <SketchMiniMap />
         </ReactFlow>
 
-        <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-2">
-          <div className="rounded-full bg-[#151f28] px-3 py-1.5 text-[11px] text-white shadow-lg">
-            <span className="font-medium">Voorbereidingsfase</span>
-            <span
-              ref={statusRef}
-              className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00] empty:hidden before:mx-2 before:text-white/25 before:content-['|']"
-            />
+        <div className="pointer-events-none absolute left-3 top-3 z-20 flex max-w-[min(360px,calc(100%-1.5rem))] flex-col gap-2">
+          {sketchHelp ? (
+            <div className="pointer-events-auto rounded-2xl bg-white px-4 py-3.5 text-[#151f28] shadow-lg ring-1 ring-black/8">
+              <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#151f28]/40">
+                {sketchHelp.title}
+              </p>
+              <ul className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-[#151f28]/75">
+                {sketchHelp.body.map((line) => (
+                  <li key={line} className="flex gap-2">
+                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#151f28]/35" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+              {sketchHelp.expect?.length ? (
+                <>
+                  <p className="mt-3 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[#151f28]/40">
+                    Vul per stap in
+                  </p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-[#151f28]/65">
+                    {sketchHelp.expect.join(" · ")}
+                  </p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            <div className="rounded-full bg-[#151f28] px-3 py-1.5 text-[11px] text-white shadow-lg">
+              <span className="font-medium">{sketchLabel}</span>
+              <span
+                ref={statusRef}
+                className="font-mono text-[10px] uppercase tracking-wider text-[#ceff00] empty:hidden before:mx-2 before:text-white/25 before:content-['|']"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={fitToScreen}
+              className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
+            >
+              Alles tonen
+            </button>
+            <button
+              type="button"
+              onClick={addStickyInView}
+              className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
+            >
+              <StickyNote className="h-3.5 w-3.5" /> Sticky
+            </button>
+            {!hideAiToggle ? (
+              <button
+                type="button"
+                onClick={() => {
+                  pushHistory("show-ai");
+                  const next = !showAiRef.current;
+                  showAiRef.current = next;
+                  setShowAiKansen(next);
+                  persist("showAiKansen");
+                }}
+                className={`pointer-events-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-lg ring-1 ${
+                  showAiKansen
+                    ? "bg-[#ceff00] text-[#151f28] ring-black/10"
+                    : "bg-white text-[#151f28]/70 ring-black/10"
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                {showAiKansen ? "Alle AI-kansen" : "Toon AI-kansen"}
+              </button>
+            ) : null}
           </div>
-          <button
-            type="button"
-            onClick={fitToScreen}
-            className="pointer-events-auto rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
-          >
-            Alle 9 tonen
-          </button>
-          <button
-            type="button"
-            onClick={addStickyInView}
-            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full bg-[#FDE047] px-3 py-1.5 text-[11px] font-semibold text-[#151f28] shadow-lg ring-1 ring-black/10"
-          >
-            <StickyNote className="h-3.5 w-3.5" /> Sticky
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              pushHistory("show-ai");
-              const next = !showAiRef.current;
-              showAiRef.current = next;
-              setShowAiKansen(next);
-              persist("showAiKansen");
-            }}
-            className={`pointer-events-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-lg ring-1 ${
-              showAiKansen
-                ? "bg-[#ceff00] text-[#151f28] ring-black/10"
-                : "bg-white text-[#151f28]/70 ring-black/10"
-            }`}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            {showAiKansen ? "Alle AI-kansen" : "Toon alle AI-kansen"}
-          </button>
         </div>
 
         <div ref={tipsRef} className="pointer-events-none absolute bottom-3 left-3 z-20 flex items-end gap-2">

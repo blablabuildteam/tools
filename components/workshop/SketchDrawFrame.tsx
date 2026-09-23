@@ -19,12 +19,16 @@ import {
   sketchFingerprint,
   type PrepPhaseSketch,
   type SketchPatchKey,
+  type WorkshopSketchHelp,
 } from "@/lib/workshop-types";
 
 export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
   const [doc, setDoc] = useState<PrepPhaseSketch | null>(null);
   const [remote, setRemote] = useState<PrepPhaseSketch | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sketchLabel, setSketchLabel] = useState("Processen");
+  const [sketchHelp, setSketchHelp] = useState<WorkshopSketchHelp | undefined>();
+  const [hideAiToggle, setHideAiToggle] = useState(false);
   const revRef = useRef<number | undefined>(undefined);
   const dirtyRef = useRef(false);
   const fingerprintRef = useRef("");
@@ -72,6 +76,10 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
           return;
         }
         if (typeof data.rev === "number") revRef.current = data.rev;
+        setSketchLabel(data.meta?.sketchLabel?.trim() || "Processen");
+        setSketchHelp(data.meta?.sketchHelp);
+        const tabs = Array.isArray(data.meta?.tabs) ? data.meta.tabs.map(String) : null;
+        setHideAiToggle(Boolean(tabs && !tabs.includes("reference")));
         const sketch = data.sketch as { aiIdeas?: unknown; milestones?: unknown; stickies?: unknown } | null;
         const hadAiField = isPrepPhaseSketch(data.sketch) && Array.isArray(sketch?.aiIdeas);
         const hadMilestones =
@@ -168,14 +176,21 @@ export default function SketchDrawFrame({ sessionId }: { sessionId: string }) {
   if (!doc) {
     return (
       <div className="flex h-full items-center justify-center bg-[#f3f1eb] text-sm text-[#151f28]/50">
-        Voorbereidingsfase laden…
+        Voorbereiding laden…
       </div>
     );
   }
 
   return (
     <div className="relative h-full w-full">
-      <PrepPhaseEditor initial={doc} remote={remote} onSave={persist} />
+      <PrepPhaseEditor
+        initial={doc}
+        remote={remote}
+        onSave={persist}
+        sketchLabel={sketchLabel}
+        sketchHelp={sketchHelp}
+        hideAiToggle={hideAiToggle}
+      />
       <WorkshopSyncNotice variant="light" corner="top-right" />
     </div>
   );

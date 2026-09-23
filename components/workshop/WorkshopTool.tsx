@@ -23,11 +23,13 @@ import {
   createEmptyIntro,
   createEmptySummary,
   normalizeColumns,
+  normalizeWorkshopTabs,
   type WorkshopCard,
   type WorkshopColumn,
   type WorkshopColumnId,
   type WorkshopMeta,
   type WorkshopSummary,
+  type WorkshopTab,
 } from "@/lib/workshop-types";
 import {
   fetchWorkshopSession,
@@ -47,7 +49,7 @@ import WorkshopSyncNotice from "@/components/workshop/WorkshopSyncNotice";
 import { ViewEnter } from "@/components/workshop/ViewEnter";
 import { BlablaLogo } from "@/components/BlablaLogo";
 
-type Tab = "intro" | "sketch" | "board" | "reference" | "wrap";
+type Tab = WorkshopTab;
 
 type SessionPayload = WorkshopClientPayload;
 
@@ -70,7 +72,7 @@ export default function WorkshopTool() {
   const [author, setAuthor] = useState("");
   const [password, setPassword] = useState("");
   const [unlockPassword, setUnlockPassword] = useState("");
-  const [tab, setTab] = useState<Tab>("intro");
+  const [tab, setTab] = useState<Tab>("sketch");
   const [meta, setMeta] = useState<Omit<WorkshopMeta, "passwordHash"> | null>(null);
   const [cards, setCards] = useState<WorkshopCard[]>([]);
   const [columns, setColumns] = useState<WorkshopColumn[]>(createDefaultColumns);
@@ -86,13 +88,40 @@ export default function WorkshopTool() {
   const sketchDirty = useRef(false);
   const summaryDirty = useRef(false);
   const columnsDirty = useRef(false);
-  const tabRef = useRef<Tab>("intro");
+  const tabRef = useRef<Tab>("sketch");
   const boardRef = useRef<HTMLDivElement>(null);
   const revRef = useRef<number | undefined>(undefined);
+  const openedSketchForSession = useRef<string | null>(null);
+
+  const visibleTabs = useMemo(
+    () => normalizeWorkshopTabs(meta?.tabs),
+    [meta?.tabs]
+  );
 
   useEffect(() => {
     tabRef.current = tab;
   }, [tab]);
+
+  useEffect(() => {
+    if (landing || !sessionId || locked) return;
+    if (!visibleTabs.includes(tab)) {
+      const fallback = visibleTabs.includes("sketch")
+        ? "sketch"
+        : visibleTabs[0] ?? "sketch";
+      if (fallback === "sketch") openSketch();
+      else setTab(fallback);
+      return;
+    }
+    if (
+      visibleTabs.includes("sketch") &&
+      openedSketchForSession.current !== sessionId &&
+      (visibleTabs.length === 1 || tab === "sketch")
+    ) {
+      openedSketchForSession.current = sessionId;
+      openSketch();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [landing, sessionId, locked, visibleTabs, tab]);
 
   function openSketch() {
     sketchDirty.current = true;
@@ -633,6 +662,7 @@ export default function WorkshopTool() {
             </div>
           </div>
 
+          {visibleTabs.length > 1 ? (
           <nav className="flex max-w-[min(100%,420px)] items-center overflow-x-auto rounded-full bg-white/[0.04] p-1 ring-1 ring-white/10 sm:max-w-none">
             {(
               [
@@ -642,7 +672,9 @@ export default function WorkshopTool() {
                 { id: "reference" as const, label: "AI-kansen", icon: Sparkles },
                 { id: "wrap" as const, label: "Afronding", icon: ClipboardCheck },
               ] as const
-            ).map(({ id, label, icon: Icon }) => {
+            )
+              .filter(({ id }) => visibleTabs.includes(id))
+              .map(({ id, label, icon: Icon }) => {
               const active = tab === id;
               return (
                 <button
@@ -661,6 +693,7 @@ export default function WorkshopTool() {
               );
             })}
           </nav>
+          ) : null}
 
           <label className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-white/[0.04] px-2.5 py-1.5 ring-1 ring-white/10 sm:px-3">
             <User className="h-3.5 w-3.5 shrink-0 text-white/35" />
