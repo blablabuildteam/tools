@@ -8,6 +8,7 @@ import ClaudeCasesView from './ClaudeCasesView';
 import ReviewView from './ReviewView';
 import PrioritizeView from './PrioritizeView';
 import RoadmapView from './RoadmapView';
+import { getSessionIntro, getSessionProfile } from './sessionIntros';
 import {
   workshopDescription,
   workshopLabel,
@@ -20,7 +21,7 @@ const SHOW_REVIEW = process.env.NODE_ENV === 'development';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type QuadrantKey = 'quick' | 'strategic' | 'low' | 'later';
-type View = 'landing' | 'matrix' | 'add' | 'workshop' | 'results' | 'claude' | 'review' | 'prioritize' | 'roadmap';
+type View = 'landing' | 'intro' | 'matrix' | 'add' | 'workshop' | 'results' | 'claude' | 'review' | 'prioritize' | 'roadmap';
 type ClaudeFit = 'good' | 'stretch' | 'blocked';
 type PriorityStatus = 'now' | 'near' | 'next' | 'later' | 'kill';
 type DeliveryPartner =
@@ -748,12 +749,18 @@ export default function AiMatrixTool() {
       const clean = sid.trim().toLowerCase();
       setSessionId(clean);
       buildShare(clean);
-      fetchUseCases(clean).finally(() => setView('matrix'));
+      fetchUseCases(clean).finally(() => {
+        setView(getSessionIntro(clean) ? 'intro' : 'matrix');
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Session actions ───────────────────────────────────────────────────────
+
+  const enterSessionView = (sid: string) => {
+    setView(getSessionIntro(sid) ? 'intro' : 'matrix');
+  };
 
   const createSession = async () => {
     if (!companyName.trim()) return;
@@ -764,7 +771,7 @@ export default function AiMatrixTool() {
     await buildShare(sid);
     await fetchUseCases(sid);
     setIsLoading(false);
-    setView('matrix');
+    enterSessionView(sid);
     setShowShare(true);
   };
 
@@ -776,7 +783,7 @@ export default function AiMatrixTool() {
     await buildShare(sid);
     await fetchUseCases(sid);
     setIsLoading(false);
-    setView('matrix');
+    enterSessionView(sid);
   };
 
   // ── Form helpers ──────────────────────────────────────────────────────────
@@ -979,6 +986,44 @@ export default function AiMatrixTool() {
       </div>
     </div>
   );
+
+  const sessionIntro = getSessionIntro(sessionId);
+  const sessionProfile = getSessionProfile(sessionId);
+  const hideClaudeCases = Boolean(sessionProfile?.hideClaudeCases);
+  const hideHelp = Boolean(sessionProfile?.hideHelp);
+
+  const IntroView = sessionIntro ? (
+    <div className="flex min-h-[calc(100vh-64px)] flex-col items-center justify-center px-5 py-16">
+      <div className="w-full max-w-lg">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.28em] text-bla-lime/70">
+          {sessionIntro.eyebrow}
+        </p>
+        <div className="space-y-4 text-[15px] leading-relaxed text-white/65 md:text-base">
+          {sessionIntro.paragraphs.map((p) => (
+            <p key={p}>
+              {p.split(/(StasDock 2\.0)/g).map((part, i) =>
+                part === 'StasDock 2.0' ? (
+                  <span key={i} className="font-medium text-white">
+                    {part}
+                  </span>
+                ) : (
+                  <span key={i}>{part}</span>
+                )
+              )}
+            </p>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setView('matrix')}
+          className="mt-10 inline-flex items-center gap-2 rounded-xl bg-bla-lime px-5 py-3 text-sm font-medium text-[#0a0b0e] transition-opacity hover:opacity-90"
+        >
+          {sessionIntro.cta}
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  ) : null;
 
   const MatrixView = (
     <div className="flex min-h-[calc(100vh-160px)] flex-col gap-6 lg:flex-row lg:items-stretch">
@@ -1727,6 +1772,7 @@ export default function AiMatrixTool() {
 
   const inSession = view !== 'landing';
   const sessionLabel = sessionId.split('-').slice(0, -1).join(' ') || sessionId;
+  const hasIntro = Boolean(sessionIntro);
 
   return (
     <div className="min-h-screen bg-[#0a0b0e] text-white">
@@ -1778,6 +1824,13 @@ export default function AiMatrixTool() {
 
               {/* Nav tabs */}
               <div className="flex gap-0.5 rounded-full border border-white/10 p-1">
+                {hasIntro ? (
+                  <button onClick={() => setView('intro')}
+                    className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'intro' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
+                    <Info className="h-3 w-3" />
+                    <span className="hidden sm:inline">Intro</span>
+                  </button>
+                ) : null}
                 <button onClick={() => setView('matrix')}
                   className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'matrix' || view === 'add' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
                   <BarChart3 className="h-3 w-3" />
@@ -1788,11 +1841,13 @@ export default function AiMatrixTool() {
                   <Trophy className="h-3 w-3" />
                   <span className="hidden sm:inline">Results</span>
                 </button>
-                <button onClick={() => setView('claude')}
-                  className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'claude' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
-                  <Code2 className="h-3 w-3" />
-                  <span className="hidden sm:inline">Claude Cases</span>
-                </button>
+                {!hideClaudeCases ? (
+                  <button onClick={() => setView('claude')}
+                    className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'claude' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
+                    <Code2 className="h-3 w-3" />
+                    <span className="hidden sm:inline">Claude Cases</span>
+                  </button>
+                ) : null}
                 <button onClick={() => setView('prioritize')}
                   className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'prioritize' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
                   <ListOrdered className="h-3 w-3" />
@@ -1810,11 +1865,13 @@ export default function AiMatrixTool() {
                     <span className="hidden sm:inline">Review</span>
                   </button>
                 )}
-                <button onClick={() => setView('workshop')}
-                  className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'workshop' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
-                  <HelpCircle className="h-3 w-3" />
-                  <span className="hidden sm:inline">Help</span>
-                </button>
+                {!hideHelp ? (
+                  <button onClick={() => setView('workshop')}
+                    className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs transition-colors ${view === 'workshop' ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white'}`}>
+                    <HelpCircle className="h-3 w-3" />
+                    <span className="hidden sm:inline">Help</span>
+                  </button>
+                ) : null}
               </div>
             </div>
           )}
@@ -1856,11 +1913,11 @@ export default function AiMatrixTool() {
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
           >
             {view === 'landing'   && LandingView}
+            {view === 'intro'     && IntroView}
             {view === 'matrix'    && MatrixView}
             {view === 'add'       && AddForm}
-            {view === 'workshop'  && WorkshopView}
             {view === 'results'   && ResultsView}
-            {view === 'claude'    && (
+            {view === 'claude' && !hideClaudeCases && (
               <ClaudeCasesView useCases={useCases} sessionId={sessionId} onBack={() => setView('matrix')} onUpdate={updateUseCase} />
             )}
             {view === 'prioritize' && (
@@ -1883,6 +1940,7 @@ export default function AiMatrixTool() {
             {SHOW_REVIEW && view === 'review' && (
               <ReviewView useCases={useCases} onBack={() => setView('matrix')} onUpdate={updateUseCase} />
             )}
+            {view === 'workshop' && !hideHelp && WorkshopView}
           </motion.div>
         </AnimatePresence>
       </main>
